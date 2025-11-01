@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { addDocument } from '../../firebase/firestore';
+import { generateItineraryPDF } from '../../utils/pdfGenerator';
 import './Itinerary.css';
 
 const Itinerary = () => {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
-  const [selections, setSelections] = useState(null);
   const [itinerary, setItinerary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -16,7 +16,6 @@ const Itinerary = () => {
     const data = sessionStorage.getItem('selections');
     if (data) {
       const parsedData = JSON.parse(data);
-      setSelections(parsedData);
       generateItinerary(parsedData);
     } else {
       navigate('/results');
@@ -162,8 +161,19 @@ const Itinerary = () => {
     }
   };
 
-  const handleDownloadPDF = () => {
-    alert('PDF download feature coming soon! This will generate a downloadable PDF of your itinerary.');
+  const handleDownloadPDF = async () => {
+    if (!itinerary) {
+      alert('No itinerary data available to download.');
+      return;
+    }
+
+    try {
+      const filename = `${itinerary.destination.replace(/\s+/g, '-')}-Itinerary-${Date.now()}.pdf`;
+      await generateItineraryPDF(itinerary, filename);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
+    }
   };
 
   const getActivityIcon = (type) => {

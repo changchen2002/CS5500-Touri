@@ -9,7 +9,9 @@ const Results = () => {
   const [selectedHotel, setSelectedHotel] = useState(null);
   const [loading, setLoading] = useState(true);
   const [flights, setFlights] = useState([]);
+  const [hotels, setHotels] = useState([]);
   const [apiError, setApiError] = useState(null);
+  const [hotelApiError, setHotelApiError] = useState(null);
 
   const mockFlights = [
     {
@@ -205,6 +207,132 @@ const Results = () => {
     });
   };
 
+  // Transform hotel API response to UI format
+  const transformHotelData = (apiResponse, searchParams) => {
+    if (!apiResponse || !apiResponse.properties) {
+      return [];
+    }
+
+    return apiResponse.properties.map((property, index) => {
+      const price = property.rate_per_night?.extracted_lowest || 
+                   property.total_rate?.extracted_lowest || 
+                   0;
+
+      return {
+        id: property.property_token || `hotel-${index}`,
+        name: property.name || 'Unknown Hotel',
+        rating: property.overall_rating || 0,
+        stars: Math.round(property.overall_rating || 0),
+        distance: property.distance_from_center || 'Distance N/A',
+        pricePerNight: Math.round(price),
+        amenities: property.amenities || [],
+        image: property.thumbnail || '🏨',
+        address: property.address || '',
+        reviews: property.reviews || 0,
+        rawData: property
+      };
+    });
+  };
+
+  // Fetch hotels from SerpApi Google Hotels API
+  const fetchHotels = async (searchParams) => {
+    try {
+      setHotelApiError(null);
+      
+      // Get API key from environment variables
+      const apiKey = process.env.REACT_APP_SERPAPI_KEY;
+      
+      if (!apiKey) {
+        throw new Error('SerpApi key not found. Please add REACT_APP_SERPAPI_KEY to your .env file.');
+      }
+
+      // Build API URL
+      const params = new URLSearchParams({
+        engine: 'google_hotels',
+        q: searchParams.location || '',
+        check_in_date: searchParams.checkIn || '',
+        check_out_date: searchParams.checkOut || '',
+        adults: searchParams.adults || 1,
+        children: searchParams.children || 0,
+        currency: searchParams.currency || 'USD',
+        gl: 'us',
+        hl: 'en',
+        api_key: apiKey
+      });
+
+      const apiUrl = `https://serpapi.com/search.json?${params.toString()}`;
+      
+      // SerpApi doesn't support CORS from browsers, so we need to use a proxy
+      // Try multiple proxy options for reliability
+      const proxyOptions = [
+        `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`,
+        `https://cors-anywhere.herokuapp.com/${apiUrl}`
+      ];
+      
+      let response;
+      let lastError;
+      
+      // Try each proxy option
+      for (const proxyUrl of proxyOptions) {
+        try {
+          // Create abort controller for timeout
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+          
+          response = await fetch(proxyUrl, {
+            method: 'GET',
+            headers: {
+              'Accept': 'application/json',
+            },
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (response.ok) {
+            break; // Success, exit loop
+          }
+        } catch (error) {
+          lastError = error;
+          console.log(`Proxy failed, trying next option...`, error.message);
+          continue; // Try next proxy
+        }
+      }
+      
+      if (!response || !response.ok) {
+        throw new Error(`Failed to fetch hotels: ${lastError?.message || 'All proxy options failed. SerpApi requires a backend proxy for browser requests.'}`);
+      }
+
+      const data = await response.json();
+      
+      // Check if API returned an error
+      if (data.error) {
+        throw new Error(data.error || 'API returned an error');
+      }
+      
+      // Transform the data
+      const transformedHotels = transformHotelData(data, searchParams);
+      
+      // Sort hotels based on user preference
+      let sortedHotels = [...transformedHotels];
+      if (searchParams.sortBy === 'price') {
+        sortedHotels.sort((a, b) => a.pricePerNight - b.pricePerNight);
+      } else if (searchParams.sortBy === 'rating') {
+        sortedHotels.sort((a, b) => b.rating - a.rating);
+      }
+
+      // Limit to top 5 results
+      const topHotels = sortedHotels.slice(0, 5);
+      setHotels(topHotels);
+    } catch (error) {
+      console.error('Error fetching hotels:', error);
+      setHotelApiError(error.message);
+      // Fall back to mock hotels on error (limited to top 5)
+      setHotels(mockHotels.slice(0, 5));
+    }
+  };
+
   // Fetch flights from FlightAPI
   const fetchFlights = async (searchParams) => {
     try {
@@ -275,24 +403,70 @@ const Results = () => {
       const parsedData = JSON.parse(data);
       setSearchData(parsedData);
       
-      // If it's a flight search, try to fetch real data
-      if (parsedData.type === 'flight') {
-        // Check if API key exists in environment
-        const apiKey = process.env.REACT_APP_FLIGHTAPI_KEY;
-        
-        if (apiKey && apiKey.trim() !== '') {
-          fetchFlights(parsedData).finally(() => {
-            setLoading(false);
-          });
+      // Handle both flight and hotel searches
+      const promises = [];
+      
+      // Extract flight parameters from unified search data
+      const flightParams = {
+        origin: parsedData.origin,
+        destination: parsedData.destination,
+        departDate: parsedData.departDate,
+        returnDate: parsedData.returnDate,
+        adults: parsedData.adults,
+        children: parsedData.children,
+        infants: parsedData.infants,
+        cabinClass: parsedData.cabinClass,
+        currency: parsedData.currency,
+        region: parsedData.region,
+        sortBy: parsedData.flightSortBy || parsedData.sortBy || 'price'
+      };
+      
+      // Extract hotel parameters from unified search data
+      const hotelParams = {
+        location: parsedData.location,
+        checkIn: parsedData.checkIn,
+        checkOut: parsedData.checkOut,
+        adults: parsedData.adults,
+        children: parsedData.children,
+        currency: parsedData.currency,
+        sortBy: parsedData.hotelSortBy || parsedData.sortBy || 'price'
+      };
+      
+      // Fetch flights if flight parameters exist
+      if (flightParams.origin && flightParams.destination && flightParams.departDate && flightParams.returnDate) {
+        const flightApiKey = process.env.REACT_APP_FLIGHTAPI_KEY;
+        if (flightApiKey && flightApiKey.trim() !== '') {
+          promises.push(fetchFlights(flightParams));
         } else {
-          // Use mock flights if no API key in environment
           setApiError('FlightAPI key not configured. Using mock data.');
           setFlights(mockFlights.slice(0, 5));
-          setLoading(false);
         }
       } else {
-        // Use mock flights if not a flight search
+        // Use mock flights if flight parameters are missing
         setFlights(mockFlights.slice(0, 5));
+      }
+      
+      // Fetch hotels if hotel parameters exist
+      if (hotelParams.location && hotelParams.checkIn && hotelParams.checkOut) {
+        const hotelApiKey = process.env.REACT_APP_SERPAPI_KEY;
+        if (hotelApiKey && hotelApiKey.trim() !== '') {
+          promises.push(fetchHotels(hotelParams));
+        } else {
+          setHotelApiError('SerpApi key not configured. Using mock data.');
+          setHotels(mockHotels.slice(0, 5));
+        }
+      } else {
+        // Use mock hotels if hotel parameters are missing
+        setHotels(mockHotels.slice(0, 5));
+      }
+      
+      // Wait for all API calls to complete
+      Promise.all(promises).finally(() => {
+        setLoading(false);
+      });
+      
+      // If no promises, set loading to false immediately
+      if (promises.length === 0) {
         setLoading(false);
       }
     } else {
@@ -425,12 +599,29 @@ const Results = () => {
 
         <section className="results-section results-section-right">
           <h2>Available Hotels</h2>
+          {hotelApiError && (
+            <div className="api-error-message" style={{ 
+              padding: '10px', 
+              marginBottom: '10px', 
+              backgroundColor: '#fee', 
+              color: '#c33',
+              borderRadius: '4px'
+            }}>
+              ⚠️ Hotel API Error: {hotelApiError}. Showing mock data as fallback.
+            </div>
+          )}
           <p className="results-subtitle">
-            Showing top {mockHotels.length} results in {searchData?.location || searchData?.destination || 'Location'}
+            Showing top {hotels.length} results in {searchData?.location || searchData?.destination || 'Location'}
           </p>
           
+          {hotels.length === 0 && !loading && (
+            <div style={{ padding: '20px', textAlign: 'center' }}>
+              No hotels found. Please try different search parameters.
+            </div>
+          )}
+          
           <div className="results-list">
-            {mockHotels.slice(0, 5).map(hotel => (
+            {hotels.map(hotel => (
               <div 
                 key={hotel.id} 
                 className={`result-card ${selectedHotel?.id === hotel.id ? 'selected' : ''}`}
@@ -440,21 +631,40 @@ const Results = () => {
                   <div>
                     <h3>{hotel.name}</h3>
                     <div className="hotel-rating">
-                      <span className="stars">{'⭐'.repeat(hotel.stars)}</span>
-                      <span className="rating-score">{hotel.rating}/5</span>
+                      <span className="stars">{'⭐'.repeat(Math.min(hotel.stars || 0, 5))}</span>
+                      <span className="rating-score">{typeof hotel.rating === 'number' ? hotel.rating.toFixed(1) : hotel.rating || 'N/A'}/5</span>
+                      {hotel.reviews > 0 && (
+                        <span className="review-count" style={{ marginLeft: '0.5rem', color: '#666', fontSize: '0.85rem' }}>
+                          ({hotel.reviews} reviews)
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <span className="hotel-icon">{hotel.image}</span>
+                  {typeof hotel.image === 'string' && hotel.image.startsWith('http') ? (
+                    <img src={hotel.image} alt={hotel.name} style={{ width: '60px', height: '60px', objectFit: 'cover', borderRadius: '8px' }} />
+                  ) : (
+                    <span className="hotel-icon">{hotel.image}</span>
+                  )}
                 </div>
                 
                 <div className="result-card-body">
                   <div className="hotel-details">
-                    <p className="distance">📍 {hotel.distance}</p>
-                    <div className="amenities">
-                      {hotel.amenities.map((amenity, index) => (
-                        <span key={index} className="amenity-tag">{amenity}</span>
-                      ))}
-                    </div>
+                    {hotel.address && (
+                      <p className="distance">📍 {hotel.address}</p>
+                    )}
+                    {hotel.distance && !hotel.address && (
+                      <p className="distance">📍 {hotel.distance}</p>
+                    )}
+                    {hotel.amenities && hotel.amenities.length > 0 && (
+                      <div className="amenities">
+                        {hotel.amenities.slice(0, 5).map((amenity, index) => (
+                          <span key={index} className="amenity-tag">{amenity}</span>
+                        ))}
+                        {hotel.amenities.length > 5 && (
+                          <span className="amenity-tag">+{hotel.amenities.length - 5} more</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   
                   <div className="result-footer">

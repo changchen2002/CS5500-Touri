@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { queryDocuments } from '../../firebase/firestore';
@@ -11,12 +11,7 @@ const Profile = () => {
   const [sharedExperiences, setSharedExperiences] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadSavedItineraries();
-    loadSharedExperiences();
-  }, []);
-
-  const loadSavedItineraries = async () => {
+  const loadSavedItineraries = useCallback(async () => {
     try {
       const itineraries = await queryDocuments(
         'itineraries',
@@ -28,9 +23,9 @@ const Profile = () => {
       console.error('Error loading itineraries:', error);
       setSavedItineraries([]);
     }
-  };
+  }, [currentUser?.uid]);
 
-  const loadSharedExperiences = async () => {
+  const loadSharedExperiences = useCallback(async () => {
     try {
       const experiences = await queryDocuments(
         'experiences',
@@ -44,7 +39,14 @@ const Profile = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [currentUser?.uid]);
+
+  useEffect(() => {
+    if (currentUser?.uid) {
+      loadSavedItineraries();
+      loadSharedExperiences();
+    }
+  }, [currentUser?.uid, loadSavedItineraries, loadSharedExperiences]);
 
   return (
     <div className="profile-container">

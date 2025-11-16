@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getDocuments, addDocument, queryDocuments } from '../../firebase/firestore';
+import { getDocuments, addDocument } from '../../firebase/firestore';
 import './Guides.css';
 
 const Guides = () => {
@@ -23,11 +23,7 @@ const Guides = () => {
     tips: ['']
   });
 
-  useEffect(() => {
-    loadGuides();
-  }, []);
-
-  const loadGuides = async () => {
+  const loadGuides = useCallback(async () => {
     try {
       // Try to load from Firestore, fallback to mock data
       try {
@@ -46,7 +42,11 @@ const Guides = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadGuides();
+  }, [loadGuides]);
 
   const getMockGuides = () => [
     {

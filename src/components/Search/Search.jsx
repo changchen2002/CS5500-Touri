@@ -13,7 +13,12 @@ const Search = () => {
     destination: location.state?.destination || '',
     departDate: '',
     returnDate: '',
-    passengers: 1,
+    adults: 1,
+    children: 0,
+    infants: 0,
+    cabinClass: 'Economy',
+    currency: 'USD',
+    region: 'US',
     sortBy: 'price'
   });
 
@@ -95,26 +100,30 @@ const Search = () => {
           <form onSubmit={handleSearch} className="search-form">
             <div className="form-row">
               <div className="form-group">
-                <label>Origin</label>
+                <label>Origin Airport Code (IATA)</label>
                 <input
                   type="text"
                   name="origin"
                   value={flightSearch.origin}
                   onChange={handleFlightChange}
-                  placeholder="e.g., Boston (BOS)"
+                  placeholder="e.g., BOS"
+                  maxLength="3"
                   required
                 />
+                <small>Enter 3-letter airport code (e.g., BOS, JFK, LAX)</small>
               </div>
               <div className="form-group">
-                <label>Destination</label>
+                <label>Destination Airport Code (IATA)</label>
                 <input
                   type="text"
                   name="destination"
                   value={flightSearch.destination}
                   onChange={handleFlightChange}
-                  placeholder="e.g., New York (JFK)"
+                  placeholder="e.g., JFK"
+                  maxLength="3"
                   required
                 />
+                <small>Enter 3-letter airport code (e.g., BOS, JFK, LAX)</small>
               </div>
             </div>
 
@@ -145,11 +154,11 @@ const Search = () => {
 
             <div className="form-row">
               <div className="form-group">
-                <label>Passengers</label>
+                <label>Adults</label>
                 <input
                   type="number"
-                  name="passengers"
-                  value={flightSearch.passengers}
+                  name="adults"
+                  value={flightSearch.adults}
                   onChange={handleFlightChange}
                   min="1"
                   max="9"
@@ -157,6 +166,79 @@ const Search = () => {
                 />
               </div>
               <div className="form-group">
+                <label>Children</label>
+                <input
+                  type="number"
+                  name="children"
+                  value={flightSearch.children}
+                  onChange={handleFlightChange}
+                  min="0"
+                  max="9"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Infants</label>
+                <input
+                  type="number"
+                  name="infants"
+                  value={flightSearch.infants}
+                  onChange={handleFlightChange}
+                  min="0"
+                  max="9"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Cabin Class</label>
+                <select
+                  name="cabinClass"
+                  value={flightSearch.cabinClass}
+                  onChange={handleFlightChange}
+                  required
+                >
+                  <option value="Economy">Economy</option>
+                  <option value="Premium_Economy">Premium Economy</option>
+                  <option value="Business">Business</option>
+                  <option value="First">First</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group">
+                <label>Currency</label>
+                <input
+                  type="text"
+                  name="currency"
+                  value={flightSearch.currency}
+                  onChange={handleFlightChange}
+                  placeholder="USD"
+                  maxLength="3"
+                  required
+                />
+                <small>3-letter currency code (e.g., USD, EUR, GBP)</small>
+              </div>
+              <div className="form-group">
+                <label>Region (ISO Code)</label>
+                <input
+                  type="text"
+                  name="region"
+                  value={flightSearch.region}
+                  onChange={handleFlightChange}
+                  placeholder="US"
+                  maxLength="2"
+                  required
+                />
+                <small>2-letter country code (e.g., US, GB, FR)</small>
+              </div>
+            </div>
+
+            <div className="form-row">
+              <div className="form-group full-width">
                 <label>Sort By</label>
                 <select
                   name="sortBy"

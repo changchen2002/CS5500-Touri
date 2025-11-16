@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { getDocument, updateDocument } from '../../firebase/firestore';
@@ -13,13 +13,7 @@ const GuideDetail = () => {
   const [loading, setLoading] = useState(!guide);
   const [liked, setLiked] = useState(false);
 
-  useEffect(() => {
-    if (!guide) {
-      loadGuide();
-    }
-  }, [id]);
-
-  const loadGuide = async () => {
+  const loadGuide = useCallback(async () => {
     try {
       const fetchedGuide = await getDocument('guides', id);
       setGuide(fetchedGuide);
@@ -37,7 +31,13 @@ const GuideDetail = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (!guide) {
+      loadGuide();
+    }
+  }, [guide, loadGuide]);
 
   const handleLike = async () => {
     if (!currentUser) {

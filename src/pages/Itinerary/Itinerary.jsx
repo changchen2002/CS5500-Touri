@@ -22,13 +22,21 @@ const Itinerary = () => {
     }
   }, [navigate]);
 
-  const generateItinerary = (data) => {
+  // Generate mock itinerary as fallback
+  const generateMockItinerary = (data) => {
     setTimeout(() => {
+      const destination = data.searchData?.destination || data.searchData?.location || 'Destination';
+      const startDate = data.searchData?.departDate || data.searchData?.checkIn;
+      const endDate = data.searchData?.returnDate || data.searchData?.checkOut;
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const numDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) || 3;
+
       const mockItinerary = {
         id: `ITN-${Date.now()}`,
-        destination: data.searchData?.destination || data.searchData?.location || 'Destination',
-        startDate: data.searchData?.departDate || data.searchData?.checkIn,
-        endDate: data.searchData?.returnDate || data.searchData?.checkOut,
+        destination: destination,
+        startDate: startDate,
+        endDate: endDate,
         flight: data.flight,
         hotel: data.hotel,
         dailyPlans: [
@@ -39,7 +47,7 @@ const Itinerary = () => {
               {
                 time: '09:00 AM',
                 activity: 'Arrival & Hotel Check-in',
-                description: `Arrive at ${data.hotel.name}, check-in and freshen up`,
+                description: `Arrive at ${data.hotel?.name || 'hotel'}, check-in and freshen up`,
                 type: 'accommodation'
               },
               {
@@ -99,7 +107,7 @@ const Itinerary = () => {
             ]
           },
           {
-            day: 3,
+            day: numDays,
             title: 'Departure Day',
             activities: [
               {
@@ -123,19 +131,176 @@ const Itinerary = () => {
               {
                 time: '02:00 PM',
                 activity: 'Airport Transfer',
-                description: `Depart for airport for ${data.flight.flightNumber} flight`,
+                description: `Depart for airport for ${data.flight?.flightNumber || 'your'} flight`,
                 type: 'transport'
               }
             ]
           }
         ],
-        totalCost: data.flight.price + (data.hotel.pricePerNight * 2),
+        travelTips: [
+          'Consider local weather and peak tourist seasons when planning activities',
+          'Don\'t miss trying authentic local dishes and visiting popular food markets',
+          'Popular attractions may require advance booking - check online',
+          'Research local public transport options or consider ride-sharing apps'
+        ],
+        totalCost: (data.flight?.price || 0) + ((data.hotel?.pricePerNight || 0) * numDays),
         createdAt: new Date().toISOString()
       };
 
       setItinerary(mockItinerary);
       setLoading(false);
     }, 2000);
+  };
+
+  // Generate itinerary using Gemini API
+  const generateItineraryWithGemini = async (data) => {
+    try {
+      const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
+      
+      if (!apiKey) {
+        console.log('Gemini API key not found, using mock itinerary');
+        generateMockItinerary(data);
+        return;
+      }
+
+      const destination = data.searchData?.destination || data.searchData?.location || 'Destination';
+      const startDate = data.searchData?.departDate || data.searchData?.checkIn;
+      const endDate = data.searchData?.returnDate || data.searchData?.checkOut;
+      
+      // Calculate number of days
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const numDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) || 3;
+
+      // Build prompt for Gemini
+      const prompt = `Create a detailed ${numDays}-day travel itinerary for ${destination} based on the following information:
+
+Flight Details:
+- Airline: ${data.flight?.airline || 'N/A'}
+- Flight Number: ${data.flight?.flightNumber || 'N/A'}
+- Departure Time: ${data.flight?.departure || 'N/A'}
+- Arrival Time: ${data.flight?.arrival || 'N/A'}
+${data.flight?.returnDeparture ? `- Return Flight: Departure ${data.flight.returnDeparture}, Arrival ${data.flight.returnArrival}` : ''}
+
+Hotel Details:
+- Name: ${data.hotel?.name || 'N/A'}
+- Location: ${data.hotel?.address || data.hotel?.distance || 'N/A'}
+- Rating: ${data.hotel?.rating || 'N/A'}/5
+
+Travel Dates: ${startDate} to ${endDate} (${numDays} days)
+
+Please create a detailed daily itinerary with:
+1. Day-by-day plans with creative, descriptive titles
+2. Specific activities with times (format: "HH:MM AM/PM")
+3. Detailed activity descriptions
+4. Activity types: accommodation, dining, sightseeing, activity, or transport
+5. Include arrival day activities, main exploration days, and departure day
+6. Make activities realistic and culturally relevant to ${destination}
+
+Return the response as a valid JSON object with this exact structure:
+{
+  "dailyPlans": [
+    {
+      "day": 1,
+      "title": "Creative day title",
+      "activities": [
+        {
+          "time": "09:00 AM",
+          "activity": "Activity name",
+          "description": "Detailed description of the activity",
+          "type": "accommodation"
+        }
+      ]
+    }
+  ],
+  "travelTips": [
+    "Practical tip 1",
+    "Practical tip 2",
+    "Practical tip 3",
+    "Practical tip 4"
+  ]
+}
+
+Make it realistic, culturally relevant, and include popular attractions and local experiences for ${destination}. Only return valid JSON, no markdown or additional text.`;
+
+      // Call Gemini API
+      // Try different model names in case one is unavailable
+      const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-pro', 'gemini-1.0-pro'];
+      let response;
+      let lastError;
+      
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+          
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: prompt
+            }]
+          }]
+        })
+      });
+
+      if (!response) {
+        throw new Error(`Failed to connect to Gemini API: ${lastError?.message || 'All models unavailable. Please check your API key and available models.'}`);
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`;
+        console.error('Gemini API error details:', errorData);
+        throw new Error(`Gemini API error: ${errorMessage}`);
+      }
+
+      const result = await response.json();
+      
+      // Extract text from Gemini response
+      const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      
+      // Try to parse JSON from the response
+      let itineraryData;
+      try {
+        // Extract JSON from markdown code blocks if present
+        const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/) || 
+                         responseText.match(/```\s*([\s\S]*?)\s*```/) ||
+                         [null, responseText];
+        const jsonText = jsonMatch[1] || responseText;
+        itineraryData = JSON.parse(jsonText.trim());
+      } catch (parseError) {
+        console.error('Failed to parse Gemini response as JSON, using mock data:', parseError);
+        generateMockItinerary(data);
+        return;
+      }
+
+      // Build the itinerary object
+      const generatedItinerary = {
+        id: `ITN-${Date.now()}`,
+        destination: destination,
+        startDate: startDate,
+        endDate: endDate,
+        flight: data.flight,
+        hotel: data.hotel,
+        dailyPlans: itineraryData.dailyPlans || [],
+        travelTips: itineraryData.travelTips || [],
+        totalCost: (data.flight?.price || 0) + ((data.hotel?.pricePerNight || 0) * numDays),
+        createdAt: new Date().toISOString()
+      };
+
+      setItinerary(generatedItinerary);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error generating itinerary with Gemini:', error);
+      // Fall back to mock itinerary on error
+      generateMockItinerary(data);
+    }
+  };
+
+  const generateItinerary = (data) => {
+    generateItineraryWithGemini(data);
   };
 
   const handleSaveItinerary = async () => {
@@ -281,26 +446,42 @@ const Itinerary = () => {
       <div className="recommendations">
         <h2>Travel Tips</h2>
         <div className="tips-grid">
-          <div className="tip-card">
-            <span className="tip-icon">💡</span>
-            <h4>Best Time to Visit</h4>
-            <p>Consider local weather and peak tourist seasons when planning activities</p>
-          </div>
-          <div className="tip-card">
-            <span className="tip-icon">🍴</span>
-            <h4>Local Cuisine</h4>
-            <p>Don't miss trying authentic local dishes and visiting popular food markets</p>
-          </div>
-          <div className="tip-card">
-            <span className="tip-icon">🎫</span>
-            <h4>Book in Advance</h4>
-            <p>Popular attractions may require advance booking - check online</p>
-          </div>
-          <div className="tip-card">
-            <span className="tip-icon">🚌</span>
-            <h4>Transportation</h4>
-            <p>Research local public transport options or consider ride-sharing apps</p>
-          </div>
+          {itinerary.travelTips && itinerary.travelTips.length > 0 ? (
+            itinerary.travelTips.map((tip, index) => {
+              const tipIcons = ['💡', '🍴', '🎫', '🚌', '🌍', '📸', '💰', '🛡️'];
+              const tipTitles = ['Best Time to Visit', 'Local Cuisine', 'Book in Advance', 'Transportation', 'Cultural Etiquette', 'Photography Tips', 'Budget Planning', 'Safety Tips'];
+              return (
+                <div key={index} className="tip-card">
+                  <span className="tip-icon">{tipIcons[index % tipIcons.length]}</span>
+                  <h4>{tipTitles[index % tipTitles.length]}</h4>
+                  <p>{tip}</p>
+                </div>
+              );
+            })
+          ) : (
+            <>
+              <div className="tip-card">
+                <span className="tip-icon">💡</span>
+                <h4>Best Time to Visit</h4>
+                <p>Consider local weather and peak tourist seasons when planning activities</p>
+              </div>
+              <div className="tip-card">
+                <span className="tip-icon">🍴</span>
+                <h4>Local Cuisine</h4>
+                <p>Don't miss trying authentic local dishes and visiting popular food markets</p>
+              </div>
+              <div className="tip-card">
+                <span className="tip-icon">🎫</span>
+                <h4>Book in Advance</h4>
+                <p>Popular attractions may require advance booking - check online</p>
+              </div>
+              <div className="tip-card">
+                <span className="tip-icon">🚌</span>
+                <h4>Transportation</h4>
+                <p>Research local public transport options or consider ride-sharing apps</p>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

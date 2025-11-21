@@ -13,12 +13,20 @@ const Profile = () => {
 
   const loadSavedItineraries = useCallback(async () => {
     try {
+      // Query without orderBy to avoid needing a composite index
       const itineraries = await queryDocuments(
         'itineraries',
-        [{ field: 'userId', operator: '==', value: currentUser.uid }],
-        'createdAt'
+        [{ field: 'userId', operator: '==', value: currentUser.uid }]
       );
-      setSavedItineraries(itineraries);
+      
+      // Sort by createdAt in JavaScript (newest first)
+      const sortedItineraries = itineraries.sort((a, b) => {
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+        return dateB - dateA; // Descending order (newest first)
+      });
+      
+      setSavedItineraries(sortedItineraries);
     } catch (error) {
       console.error('Error loading itineraries:', error);
       setSavedItineraries([]);
@@ -27,12 +35,20 @@ const Profile = () => {
 
   const loadSharedExperiences = useCallback(async () => {
     try {
+      // Query without orderBy to avoid needing a composite index
       const experiences = await queryDocuments(
         'experiences',
-        [{ field: 'userId', operator: '==', value: currentUser.uid }],
-        'createdAt'
+        [{ field: 'userId', operator: '==', value: currentUser.uid }]
       );
-      setSharedExperiences(experiences);
+      
+      // Sort by createdAt in JavaScript (newest first)
+      const sortedExperiences = experiences.sort((a, b) => {
+        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+        return dateB - dateA; // Descending order (newest first)
+      });
+      
+      setSharedExperiences(sortedExperiences);
     } catch (error) {
       console.error('Error loading experiences:', error);
       setSharedExperiences([]);
@@ -69,7 +85,12 @@ const Profile = () => {
           ) : savedItineraries.length > 0 ? (
             <div className="itineraries-grid">
               {savedItineraries.map((itinerary) => (
-                <div key={itinerary.id} className="itinerary-card">
+                <div 
+                  key={itinerary.id} 
+                  className="itinerary-card"
+                  onClick={() => navigate(`/itinerary/${itinerary.id}`)}
+                  style={{ cursor: 'pointer' }}
+                >
                   <div className="card-header">
                     <h3>{itinerary.destination}</h3>
                     <span className="card-date">
@@ -83,7 +104,7 @@ const Profile = () => {
                   </div>
                   <div className="card-footer">
                     <span className="saved-date">
-                      Saved: {new Date(itinerary.createdAt).toLocaleDateString()}
+                      Saved: {itinerary.createdAt?.toDate ? itinerary.createdAt.toDate().toLocaleDateString() : (itinerary.createdAt ? new Date(itinerary.createdAt).toLocaleDateString() : 'N/A')}
                     </span>
                   </div>
                 </div>

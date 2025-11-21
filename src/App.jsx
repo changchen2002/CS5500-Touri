@@ -34,7 +34,7 @@ function App() {
             <Route path="/search" element={<Search />} />
             <Route path="/results" element={<Results />} />
             <Route 
-              path="/itinerary" 
+              path="/itinerary/:id?" 
               element={
                 <ProtectedRoute>
                   <Itinerary />

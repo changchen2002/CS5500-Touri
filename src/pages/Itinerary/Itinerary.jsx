@@ -1,26 +1,82 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { addDocument } from '../../firebase/firestore';
+import { addDocument, queryDocuments } from '../../firebase/firestore';
 import { generateItineraryPDF } from '../../utils/pdfGenerator';
 import './Itinerary.css';
 
 const Itinerary = () => {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { id } = useParams();
+  const { currentUser, loading: authLoading } = useAuth();
   const [itinerary, setItinerary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const data = sessionStorage.getItem('selections');
-    if (data) {
-      const parsedData = JSON.parse(data);
-      generateItinerary(parsedData);
-    } else {
-      navigate('/results');
-    }
-  }, [navigate]);
+    const loadItinerary = async () => {
+      // If there's an ID in the route, load from Firestore (saved itinerary)
+      if (id) {
+        // Wait for auth to finish loading
+        if (authLoading) {
+          return;
+        }
+        
+        // Wait for currentUser to be available
+        if (!currentUser) {
+          alert('Please sign in to view saved itineraries.');
+          navigate('/auth');
+          return;
+        }
+
+        try {
+          // Use queryDocuments instead of getDocument to work with Firestore rules
+          // Query for the specific itinerary ID with userId filter to ensure user owns it
+          const results = await queryDocuments(
+            'itineraries',
+            [
+              { field: 'userId', operator: '==', value: currentUser.uid }
+            ]
+          );
+          
+          // Find the itinerary with matching ID
+          const savedItinerary = results.find(it => it.id === id);
+          
+          if (!savedItinerary) {
+            throw new Error('Itinerary not found or you do not have permission to view it.');
+          }
+          
+          // The itinerary is already complete from Firestore - use it directly
+          // No need to generate, just display what we fetched
+          setItinerary(savedItinerary);
+          setLoading(false);
+        } catch (error) {
+          let errorMessage = 'Failed to load itinerary.';
+          if (error.code === 'permission-denied' || error.code === 'PERMISSION_DENIED') {
+            errorMessage = 'Permission denied. Please make sure you are signed in and own this itinerary.';
+          } else if (error.message?.includes('not found') || error.code === 'not-found') {
+            errorMessage = 'Itinerary not found. It may have been deleted.';
+          } else {
+            errorMessage = `Error: ${error.message || 'Unknown error'}`;
+          }
+          
+          alert(errorMessage);
+          navigate('/profile');
+        }
+      } else {
+        // Otherwise, check sessionStorage for newly generated itinerary
+        const data = sessionStorage.getItem('selections');
+        if (data) {
+          const parsedData = JSON.parse(data);
+          generateItinerary(parsedData);
+        } else {
+          navigate('/results');
+        }
+      }
+    };
+
+    loadItinerary();
+  }, [id, navigate, currentUser, authLoading]);
 
   // Generate mock itinerary as fallback
   const generateMockItinerary = (data) => {
@@ -158,7 +214,6 @@ const Itinerary = () => {
       const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
       
       if (!apiKey) {
-        console.log('Gemini API key not found, using mock itinerary');
         generateMockItinerary(data);
         return;
       }
@@ -252,7 +307,6 @@ Make it realistic, culturally relevant, and include popular attractions and loca
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         const errorMessage = errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`;
-        console.error('Gemini API error details:', errorData);
         throw new Error(`Gemini API error: ${errorMessage}`);
       }
 
@@ -271,7 +325,6 @@ Make it realistic, culturally relevant, and include popular attractions and loca
         const jsonText = jsonMatch[1] || responseText;
         itineraryData = JSON.parse(jsonText.trim());
       } catch (parseError) {
-        console.error('Failed to parse Gemini response as JSON, using mock data:', parseError);
         generateMockItinerary(data);
         return;
       }
@@ -293,7 +346,6 @@ Make it realistic, culturally relevant, and include popular attractions and loca
       setItinerary(generatedItinerary);
       setLoading(false);
     } catch (error) {
-      console.error('Error generating itinerary with Gemini:', error);
       // Fall back to mock itinerary on error
       generateMockItinerary(data);
     }
@@ -327,7 +379,6 @@ Make it realistic, culturally relevant, and include popular attractions and loca
       
       alert('Itinerary saved successfully! You can view it in your saved itineraries.');
     } catch (error) {
-      console.error('Error saving itinerary:', error);
       const errorMessage = error.message || 'Unknown error occurred';
       alert(`Failed to save itinerary: ${errorMessage}. Please try again.`);
     } finally {
@@ -345,7 +396,6 @@ Make it realistic, culturally relevant, and include popular attractions and loca
       const filename = `${itinerary.destination.replace(/\s+/g, '-')}-Itinerary-${Date.now()}.pdf`;
       await generateItineraryPDF(itinerary, filename);
     } catch (error) {
-      console.error('Error generating PDF:', error);
       alert('Failed to generate PDF. Please try again.');
     }
   };

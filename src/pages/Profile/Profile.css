@@ -189,12 +189,17 @@
     border-radius: 12px;
     padding: 1.5rem;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    transition: all 0.3s;
+    transition: all 0.3s ease;
   }
   
   .itinerary-card:hover {
     transform: translateY(-4px);
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+    border: 2px solid #4CAF50;
+  }
+  
+  .itinerary-card:active {
+    transform: translateY(-2px);
   }
   
   .card-header {

@@ -310,17 +310,26 @@ Make it realistic, culturally relevant, and include popular attractions and loca
       return;
     }
 
+    if (!itinerary) {
+      alert('No itinerary to save. Please generate an itinerary first.');
+      return;
+    }
+
     setSaving(true);
     try {
-      await addDocument('itineraries', {
+      const itineraryData = {
         ...itinerary,
         userId: currentUser.uid,
         userEmail: currentUser.email
-      });
-      alert('Itinerary saved successfully!');
+      };
+      
+      await addDocument('itineraries', itineraryData);
+      
+      alert('Itinerary saved successfully! You can view it in your saved itineraries.');
     } catch (error) {
       console.error('Error saving itinerary:', error);
-      alert('Failed to save itinerary. Please try again.');
+      const errorMessage = error.message || 'Unknown error occurred';
+      alert(`Failed to save itinerary: ${errorMessage}. Please try again.`);
     } finally {
       setSaving(false);
     }

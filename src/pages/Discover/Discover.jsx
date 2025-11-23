@@ -1,126 +1,74 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getDocuments } from '../../firebase/firestore';
 import './Discover.css';
 
 const Discover = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-
-  const popularDestinations = [
-    {
-      id: '1',
-      name: 'Paris, France',
-      image: '🗼',
-      description: 'The City of Light - Romantic architecture, world-class museums, and exquisite cuisine',
-      category: 'European',
-      rating: 4.8,
-      attractions: ['Eiffel Tower', 'Louvre Museum', 'Notre-Dame', 'Seine River'],
-      bestTime: 'April - October',
-      avgCost: '$$$'
-    },
-    {
-      id: '2',
-      name: 'Tokyo, Japan',
-      image: '🌸',
-      description: 'Where tradition meets innovation - Ancient temples alongside futuristic technology',
-      category: 'Asian',
-      rating: 4.9,
-      attractions: ['Shibuya Crossing', 'Tokyo Skytree', 'Senso-ji Temple', 'Tsukiji Market'],
-      bestTime: 'March - May, September - November',
-      avgCost: '$$$'
-    },
-    {
-      id: '3',
-      name: 'New York, USA',
-      image: '🗽',
-      description: 'The city that never sleeps - Iconic landmarks and endless entertainment',
-      category: 'North American',
-      rating: 4.7,
-      attractions: ['Statue of Liberty', 'Central Park', 'Times Square', 'Brooklyn Bridge'],
-      bestTime: 'April - June, September - November',
-      avgCost: '$$$$'
-    },
-    {
-      id: '4',
-      name: 'Bali, Indonesia',
-      image: '🏝️',
-      description: 'Tropical paradise - Beautiful beaches, ancient temples, and lush rice terraces',
-      category: 'Southeast Asian',
-      rating: 4.8,
-      attractions: ['Tanah Lot Temple', 'Ubud Monkey Forest', 'Tegallalang Rice Terrace', 'Seminyak Beach'],
-      bestTime: 'April - October',
-      avgCost: '$'
-    },
-    {
-      id: '5',
-      name: 'Santorini, Greece',
-      image: '🌅',
-      description: 'Stunning sunsets and white-washed buildings overlooking the Aegean Sea',
-      category: 'European',
-      rating: 4.9,
-      attractions: ['Oia Village', 'Red Beach', 'Ancient Thera', 'Wine Tasting Tours'],
-      bestTime: 'May - September',
-      avgCost: '$$$'
-    },
-    {
-      id: '6',
-      name: 'Iceland',
-      image: '🧊',
-      description: 'Land of fire and ice - Geysers, glaciers, and the Northern Lights',
-      category: 'European',
-      rating: 4.8,
-      attractions: ['Blue Lagoon', 'Golden Circle', 'Northern Lights', 'Jökulsárlón Glacier'],
-      bestTime: 'June - August, September - March (Northern Lights)',
-      avgCost: '$$$'
-    },
-    {
-      id: '7',
-      name: 'Dubai, UAE',
-      image: '🏜️',
-      description: 'Luxury and innovation in the desert - Skyscrapers, shopping, and adventure',
-      category: 'Middle Eastern',
-      rating: 4.6,
-      attractions: ['Burj Khalifa', 'Palm Jumeirah', 'Dubai Mall', 'Desert Safari'],
-      bestTime: 'November - March',
-      avgCost: '$$$'
-    },
-    {
-      id: '8',
-      name: 'Sydney, Australia',
-      image: '🇦🇺',
-      description: 'Harbor city with iconic Opera House and world-famous beaches',
-      category: 'Australian',
-      rating: 4.7,
-      attractions: ['Sydney Opera House', 'Harbour Bridge', 'Bondi Beach', 'Royal Botanic Gardens'],
-      bestTime: 'September - November, March - May',
-      avgCost: '$$$'
-    }
-  ];
-
-  const categories = ['All', 'European', 'Asian', 'North American', 'Southeast Asian', 'Middle Eastern', 'Australian'];
-
+  const [experiences, setExperiences] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('All');
 
-  const filteredDestinations = popularDestinations.filter(dest => {
-    const matchesSearch = dest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         dest.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || dest.category === selectedCategory;
+  const loadExperiences = useCallback(async () => {
+    try {
+      const fetchedExperiences = await getDocuments('experiences');
+      setExperiences(fetchedExperiences);
+    } catch (error) {
+      console.error('Error loading experiences:', error);
+      setExperiences([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadExperiences();
+  }, [loadExperiences]);
+
+  // Extract unique destinations for category filtering
+  const categories = ['All', ...new Set(experiences.map(exp => {
+    // Extract region/category from destination
+    const dest = exp.destination.toLowerCase();
+    if (dest.includes('france') || dest.includes('paris') || dest.includes('greece') || dest.includes('italy') || dest.includes('spain') || dest.includes('iceland')) return 'European';
+    if (dest.includes('japan') || dest.includes('tokyo') || dest.includes('china') || dest.includes('korea')) return 'Asian';
+    if (dest.includes('usa') || dest.includes('canada') || dest.includes('new york') || dest.includes('los angeles')) return 'North American';
+    if (dest.includes('bali') || dest.includes('indonesia') || dest.includes('thailand') || dest.includes('vietnam') || dest.includes('singapore')) return 'Southeast Asian';
+    if (dest.includes('dubai') || dest.includes('uae') || dest.includes('egypt') || dest.includes('turkey')) return 'Middle Eastern';
+    if (dest.includes('australia') || dest.includes('sydney') || dest.includes('new zealand')) return 'Australian';
+    return 'Other';
+  }))].filter(Boolean);
+
+  // Helper function to get category for an experience
+  const getCategory = (destination) => {
+    const dest = destination.toLowerCase();
+    if (dest.includes('france') || dest.includes('paris') || dest.includes('greece') || dest.includes('italy') || dest.includes('spain') || dest.includes('iceland')) return 'European';
+    if (dest.includes('japan') || dest.includes('tokyo') || dest.includes('china') || dest.includes('korea')) return 'Asian';
+    if (dest.includes('usa') || dest.includes('canada') || dest.includes('new york') || dest.includes('los angeles')) return 'North American';
+    if (dest.includes('bali') || dest.includes('indonesia') || dest.includes('thailand') || dest.includes('vietnam') || dest.includes('singapore')) return 'Southeast Asian';
+    if (dest.includes('dubai') || dest.includes('uae') || dest.includes('egypt') || dest.includes('turkey')) return 'Middle Eastern';
+    if (dest.includes('australia') || dest.includes('sydney') || dest.includes('new zealand')) return 'Australian';
+    return 'Other';
+  };
+
+  const filteredExperiences = experiences.filter(exp => {
+    const matchesSearch = exp.destination.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         exp.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         exp.title?.toLowerCase().includes(searchQuery.toLowerCase());
+    const expCategory = getCategory(exp.destination);
+    const matchesCategory = selectedCategory === 'All' || expCategory === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
   const handleExploreDestination = (destination) => {
-    navigate('/search', { state: { destination: destination.name } });
-  };
-
-  const handleViewGuides = (destination) => {
-    navigate('/guides', { state: { destination: destination.name } });
+    navigate('/search', { state: { destination } });
   };
 
   return (
     <div className="discover-container">
       <div className="discover-header">
-        <h1>Discover Amazing Destinations</h1>
-        <p>Explore popular travel destinations and get inspired for your next adventure</p>
+        <h1>Discover Travel Experiences</h1>
+        <p>Explore real travel experiences shared by our community</p>
       </div>
 
       <div className="discover-filters">
@@ -148,62 +96,86 @@ const Discover = () => {
         </div>
       </div>
 
-      <div className="destinations-grid">
-        {filteredDestinations.map(destination => (
-          <div key={destination.id} className="destination-card">
-            <div className="destination-header">
-              <div className="destination-icon">{destination.image}</div>
-              <div className="destination-rating">
-                <span className="stars">{'⭐'.repeat(Math.floor(destination.rating))}</span>
-                <span className="rating-number">{destination.rating}</span>
+      {loading ? (
+        <div className="loading-message">Loading experiences...</div>
+      ) : filteredExperiences.length > 0 ? (
+        <div className="destinations-grid">
+          {filteredExperiences.map(experience => (
+            <div key={experience.id} className="destination-card">
+              <div className="destination-header">
+                <div className="destination-icon">
+                  {experience.photos && experience.photos.length > 0 && experience.photos[0] ? (
+                    <img src={experience.photos[0]} alt={experience.destination} style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '8px' }} />
+                  ) : (
+                    <div style={{ fontSize: '48px' }}>🌍</div>
+                  )}
+                </div>
+                <div className="destination-rating">
+                  <span className="stars">{'⭐'.repeat(experience.rating || 0)}</span>
+                  <span className="rating-number">{experience.rating || 0}</span>
+                </div>
+              </div>
+
+              <div className="destination-content">
+                <h3>{experience.title || experience.destination}</h3>
+                <p className="destination-description">
+                  {experience.description.length > 150
+                    ? `${experience.description.substring(0, 150)}...`
+                    : experience.description}
+                </p>
+
+                <div className="destination-meta">
+                  <span className="meta-tag">{getCategory(experience.destination)}</span>
+                  <span className="meta-tag">📍 {experience.destination}</span>
+                </div>
+
+                {experience.highlights && experience.highlights.length > 0 && (
+                  <div className="destination-attractions">
+                    <strong>Highlights:</strong>
+                    <ul>
+                      {experience.highlights.slice(0, 3).map((highlight, idx) => (
+                        <li key={idx}>{highlight}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {experience.tripDate && (
+                  <div className="destination-timing">
+                    <span className="timing-icon">📅</span>
+                    <span>Visited: {new Date(experience.tripDate).toLocaleDateString()}</span>
+                  </div>
+                )}
+
+                <div className="experience-author">
+                  <span>👤 Shared by {experience.userName || 'Anonymous'}</span>
+                </div>
+              </div>
+
+              <div className="destination-actions">
+                <button
+                  className="action-btn primary"
+                  onClick={() => handleExploreDestination(experience.destination)}
+                >
+                  Plan Trip Here
+                </button>
+                {experience.tips && experience.tips.length > 0 && (
+                  <button
+                    className="action-btn secondary"
+                    onClick={() => alert(`Tips:\n\n${experience.tips.join('\n\n')}`)}
+                  >
+                    View Tips
+                  </button>
+                )}
               </div>
             </div>
-            
-            <div className="destination-content">
-              <h3>{destination.name}</h3>
-              <p className="destination-description">{destination.description}</p>
-              
-              <div className="destination-meta">
-                <span className="meta-tag">{destination.category}</span>
-                <span className="meta-tag">{destination.avgCost}</span>
-              </div>
-
-              <div className="destination-attractions">
-                <strong>Must See:</strong>
-                <ul>
-                  {destination.attractions.slice(0, 3).map((attraction, idx) => (
-                    <li key={idx}>{attraction}</li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="destination-timing">
-                <span className="timing-icon">📅</span>
-                <span>Best Time: {destination.bestTime}</span>
-              </div>
-            </div>
-
-            <div className="destination-actions">
-              <button
-                className="action-btn primary"
-                onClick={() => handleExploreDestination(destination)}
-              >
-                Plan Trip
-              </button>
-              <button
-                className="action-btn secondary"
-                onClick={() => handleViewGuides(destination)}
-              >
-                View Guides
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {filteredDestinations.length === 0 && (
+          ))}
+        </div>
+      ) : (
         <div className="no-results">
-          <p>No destinations found matching your criteria.</p>
+          <p>{searchQuery || selectedCategory !== 'All'
+            ? 'No experiences found matching your criteria.'
+            : 'No experiences shared yet. Be the first to share your travel story!'}</p>
           <button onClick={() => { setSearchQuery(''); setSelectedCategory('All'); }}>
             Clear Filters
           </button>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { queryDocuments } from '../../firebase/firestore';
+import { queryDocuments, deleteDocument } from '../../firebase/firestore';
 import './Profile.css';
 
 const Profile = () => {
@@ -64,6 +64,38 @@ const Profile = () => {
     }
   }, [currentUser?.uid, loadSavedItineraries, loadSharedExperiences]);
 
+  const handleDeleteExperience = async (experienceId) => {
+    if (!window.confirm('Are you sure you want to delete this experience? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await deleteDocument('experiences', experienceId);
+      alert('Experience deleted successfully!');
+      // Reload experiences to reflect the deletion
+      loadSharedExperiences();
+    } catch (error) {
+      console.error('Error deleting experience:', error);
+      alert('Failed to delete experience. Please try again.');
+    }
+  };
+
+  const handleDeleteItinerary = async (itineraryId) => {
+    if (!window.confirm('Are you sure you want to delete this itinerary? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await deleteDocument('itineraries', itineraryId);
+      alert('Itinerary deleted successfully!');
+      // Reload itineraries to reflect the deletion
+      loadSavedItineraries();
+    } catch (error) {
+      console.error('Error deleting itinerary:', error);
+      alert('Failed to delete itinerary. Please try again.');
+    }
+  };
+
   return (
     <div className="profile-container">
       <div className="profile-header">
@@ -85,27 +117,41 @@ const Profile = () => {
           ) : savedItineraries.length > 0 ? (
             <div className="itineraries-grid">
               {savedItineraries.map((itinerary) => (
-                <div 
-                  key={itinerary.id} 
-                  className="itinerary-card"
-                  onClick={() => navigate(`/itinerary/${itinerary.id}`)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <div className="card-header">
-                    <h3>{itinerary.destination}</h3>
-                    <span className="card-date">
-                      {new Date(itinerary.startDate).toLocaleDateString()}
-                    </span>
+                <div key={itinerary.id} className="itinerary-card">
+                  <div className="card-clickable" onClick={() => navigate(`/itinerary/${itinerary.id}`)}>
+                    <div className="card-header">
+                      <h3>{itinerary.destination}</h3>
+                      <span className="card-date">
+                        {new Date(itinerary.startDate).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="card-content">
+                      <p><strong>Flight:</strong> {itinerary.flight?.airline} - {itinerary.flight?.flightNumber}</p>
+                      <p><strong>Hotel:</strong> {itinerary.hotel?.name}</p>
+                      <p className="card-cost"><strong>Total Cost:</strong> ${itinerary.totalCost}</p>
+                    </div>
+                    <div className="card-footer">
+                      <span className="saved-date">
+                        Saved: {itinerary.createdAt?.toDate ? itinerary.createdAt.toDate().toLocaleDateString() : (itinerary.createdAt ? new Date(itinerary.createdAt).toLocaleDateString() : 'N/A')}
+                      </span>
+                    </div>
                   </div>
-                  <div className="card-content">
-                    <p><strong>Flight:</strong> {itinerary.flight?.airline} - {itinerary.flight?.flightNumber}</p>
-                    <p><strong>Hotel:</strong> {itinerary.hotel?.name}</p>
-                    <p className="card-cost"><strong>Total Cost:</strong> ${itinerary.totalCost}</p>
-                  </div>
-                  <div className="card-footer">
-                    <span className="saved-date">
-                      Saved: {itinerary.createdAt?.toDate ? itinerary.createdAt.toDate().toLocaleDateString() : (itinerary.createdAt ? new Date(itinerary.createdAt).toLocaleDateString() : 'N/A')}
-                    </span>
+                  <div className="card-actions">
+                    <button
+                      className="view-btn"
+                      onClick={() => navigate(`/itinerary/${itinerary.id}`)}
+                    >
+                      📄 View Details
+                    </button>
+                    <button
+                      className="delete-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteItinerary(itinerary.id);
+                      }}
+                    >
+                      🗑️ Delete
+                    </button>
                   </div>
                 </div>
               ))}
@@ -158,6 +204,24 @@ const Profile = () => {
                       </div>
                     </div>
                   )}
+                  {experience.tips && experience.tips.length > 0 && (
+                    <div className="experience-highlights" style={{ marginTop: '0.5rem' }}>
+                      <strong>Tips:</strong>
+                      <div className="highlights-tags">
+                        {experience.tips.slice(0, 2).map((tip, idx) => (
+                          <span key={idx} className="highlight-tag">💡 {tip}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="card-actions">
+                    <button
+                      className="delete-btn"
+                      onClick={() => handleDeleteExperience(experience.id)}
+                    >
+                      🗑️ Delete
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

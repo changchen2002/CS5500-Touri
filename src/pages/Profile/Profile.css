@@ -310,32 +310,111 @@
     font-weight: 500;
   }
   
+  /* Card Actions */
+  .card-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #f0f0f0;
+  }
+
+  .delete-btn {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .delete-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 107, 107, 0.4);
+    background: linear-gradient(135deg, #ff5252 0%, #e63946 100%);
+  }
+
+  .delete-btn:active {
+    transform: translateY(0);
+  }
+
+  .view-btn {
+    flex: 1;
+    padding: 0.75rem 1rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .view-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  }
+
+  .view-btn:active {
+    transform: translateY(0);
+  }
+
+  /* Clickable card area */
+  .card-clickable {
+    cursor: pointer;
+  }
+
+  .card-clickable:hover {
+    opacity: 0.98;
+  }
+
   @media (max-width: 768px) {
     .profile-container {
       padding: 1rem;
     }
-  
+
     .profile-header {
       flex-direction: column;
       text-align: center;
       padding: 1.5rem;
     }
-  
+
     .profile-avatar {
       width: 80px;
       height: 80px;
       font-size: 2.5rem;
     }
-  
+
     .profile-info h1 {
       font-size: 1.5rem;
     }
-  
+
     .itineraries-grid {
       grid-template-columns: 1fr;
     }
-  
+
+    .experiences-grid {
+      grid-template-columns: 1fr;
+    }
+
     .stats-grid {
       grid-template-columns: 1fr;
+    }
+
+    .card-actions {
+      flex-direction: column;
     }
   }

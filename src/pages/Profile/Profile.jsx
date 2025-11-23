@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { queryDocuments, deleteDocument } from '../../firebase/firestore';
+import { queryDocuments, deleteDocument, updateDocument } from '../../firebase/firestore';
 import './Profile.css';
 
 const Profile = () => {
@@ -10,6 +10,8 @@ const Profile = () => {
   const [savedItineraries, setSavedItineraries] = useState([]);
   const [sharedExperiences, setSharedExperiences] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editingExperience, setEditingExperience] = useState(null);
+  const [editFormData, setEditFormData] = useState(null);
 
   const loadSavedItineraries = useCallback(async () => {
     try {
@@ -93,6 +95,79 @@ const Profile = () => {
     } catch (error) {
       console.error('Error deleting itinerary:', error);
       alert('Failed to delete itinerary. Please try again.');
+    }
+  };
+
+  const handleEditExperience = (experience) => {
+    setEditingExperience(experience.id);
+    setEditFormData({
+      destination: experience.destination || '',
+      tripDate: experience.tripDate || '',
+      title: experience.title || '',
+      description: experience.description || '',
+      highlights: experience.highlights || [''],
+      photos: experience.photos || [''],
+      rating: experience.rating || 5,
+      tips: experience.tips || ['']
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingExperience(null);
+    setEditFormData(null);
+  };
+
+  const handleEditFormChange = (field, value) => {
+    setEditFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleEditArrayChange = (field, index, value) => {
+    setEditFormData(prev => ({
+      ...prev,
+      [field]: prev[field].map((item, i) => i === index ? value : item)
+    }));
+  };
+
+  const addEditArrayField = (field) => {
+    setEditFormData(prev => ({
+      ...prev,
+      [field]: [...prev[field], '']
+    }));
+  };
+
+  const removeEditArrayField = (field, index) => {
+    setEditFormData(prev => ({
+      ...prev,
+      [field]: prev[field].filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleUpdateExperience = async (e) => {
+    e.preventDefault();
+
+    try {
+      const updatedData = {
+        destination: editFormData.destination,
+        tripDate: editFormData.tripDate,
+        title: editFormData.title,
+        description: editFormData.description,
+        highlights: editFormData.highlights.filter(h => h.length > 0),
+        tips: editFormData.tips.filter(t => t.length > 0),
+        photos: editFormData.photos.filter(p => p.length > 0),
+        rating: Number(editFormData.rating)
+      };
+
+      await updateDocument('experiences', editingExperience, updatedData);
+      alert('Experience updated successfully!');
+      setEditingExperience(null);
+      setEditFormData(null);
+      loadSharedExperiences();
+    } catch (error) {
+      console.error('Error updating experience:', error);
+      alert('Failed to update experience. Please try again.');
     }
   };
 
@@ -216,6 +291,12 @@ const Profile = () => {
                   )}
                   <div className="card-actions">
                     <button
+                      className="edit-btn"
+                      onClick={() => handleEditExperience(experience)}
+                    >
+                      ✏️ Edit
+                    </button>
+                    <button
                       className="delete-btn"
                       onClick={() => handleDeleteExperience(experience.id)}
                     >
@@ -269,6 +350,204 @@ const Profile = () => {
           </div>
         </section>
       </div>
+
+      {editingExperience && editFormData && (
+        <div className="edit-modal">
+          <div className="edit-modal-content">
+            <div className="edit-modal-header">
+              <h2>Edit Experience</h2>
+              <button className="close-btn" onClick={handleCancelEdit}>×</button>
+            </div>
+
+            <form onSubmit={handleUpdateExperience} className="edit-form">
+              <div className="form-section">
+                <h3>Trip Details</h3>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Destination *</label>
+                    <input
+                      type="text"
+                      value={editFormData.destination}
+                      onChange={(e) => handleEditFormChange('destination', e.target.value)}
+                      placeholder="e.g., Paris, France"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Trip Date *</label>
+                    <input
+                      type="date"
+                      value={editFormData.tripDate}
+                      onChange={(e) => handleEditFormChange('tripDate', e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Experience Title *</label>
+                  <input
+                    type="text"
+                    value={editFormData.title}
+                    onChange={(e) => handleEditFormChange('title', e.target.value)}
+                    placeholder="e.g., Amazing 3-Day Trip to Paris"
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Overall Rating</label>
+                  <div className="rating-input">
+                    {[1, 2, 3, 4, 5].map(rating => (
+                      <button
+                        key={rating}
+                        type="button"
+                        className={`rating-star ${editFormData.rating >= rating ? 'active' : ''}`}
+                        onClick={() => handleEditFormChange('rating', rating)}
+                      >
+                        ⭐
+                      </button>
+                    ))}
+                    <span className="rating-text">{editFormData.rating} / 5</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="form-section">
+                <h3>Your Story</h3>
+
+                <div className="form-group">
+                  <label>Describe Your Experience *</label>
+                  <textarea
+                    value={editFormData.description}
+                    onChange={(e) => handleEditFormChange('description', e.target.value)}
+                    placeholder="Tell us about your trip..."
+                    rows="6"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-section">
+                <h3>Trip Highlights</h3>
+
+                {editFormData.highlights.map((highlight, index) => (
+                  <div key={index} className="array-input-group">
+                    <input
+                      type="text"
+                      value={highlight}
+                      onChange={(e) => handleEditArrayChange('highlights', index, e.target.value)}
+                      placeholder={`Highlight ${index + 1}`}
+                      className="array-input"
+                    />
+                    {editFormData.highlights.length > 1 && (
+                      <button
+                        type="button"
+                        className="remove-btn"
+                        onClick={() => removeEditArrayField('highlights', index)}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  className="add-field-btn"
+                  onClick={() => addEditArrayField('highlights')}
+                >
+                  + Add Highlight
+                </button>
+              </div>
+
+              <div className="form-section">
+                <h3>Tips for Future Travelers</h3>
+
+                {editFormData.tips.map((tip, index) => (
+                  <div key={index} className="array-input-group">
+                    <input
+                      type="text"
+                      value={tip}
+                      onChange={(e) => handleEditArrayChange('tips', index, e.target.value)}
+                      placeholder={`Tip ${index + 1}`}
+                      className="array-input"
+                    />
+                    {editFormData.tips.length > 1 && (
+                      <button
+                        type="button"
+                        className="remove-btn"
+                        onClick={() => removeEditArrayField('tips', index)}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  className="add-field-btn"
+                  onClick={() => addEditArrayField('tips')}
+                >
+                  + Add Tip
+                </button>
+              </div>
+
+              <div className="form-section">
+                <h3>Photos (Optional)</h3>
+                <p className="helper-text">Add photo URLs to showcase your trip</p>
+
+                {editFormData.photos.map((photo, index) => (
+                  <div key={index} className="array-input-group">
+                    <input
+                      type="url"
+                      value={photo}
+                      onChange={(e) => handleEditArrayChange('photos', index, e.target.value)}
+                      placeholder={`Photo URL ${index + 1}`}
+                      className="array-input"
+                    />
+                    {editFormData.photos.length > 1 && (
+                      <button
+                        type="button"
+                        className="remove-btn"
+                        onClick={() => removeEditArrayField('photos', index)}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  className="add-field-btn"
+                  onClick={() => addEditArrayField('photos')}
+                >
+                  + Add Photo URL
+                </button>
+              </div>
+
+              <div className="form-actions">
+                <button
+                  type="button"
+                  className="cancel-btn"
+                  onClick={handleCancelEdit}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="submit-btn"
+                >
+                  Update Experience
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

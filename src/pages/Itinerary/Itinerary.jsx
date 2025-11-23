@@ -80,7 +80,6 @@ const Itinerary = () => {
 
   // Generate mock itinerary as fallback
   const generateMockItinerary = (data) => {
-    // Remove setTimeout - generate instantly!
     const destination = data.searchData?.destination || data.searchData?.location || 'Destination';
     const startDate = data.searchData?.departDate || data.searchData?.checkIn;
     const endDate = data.searchData?.returnDate || data.searchData?.checkOut;

@@ -49,7 +49,7 @@ const ShareExperience = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!currentUser) {
       alert('Please sign in to share your experience');
       navigate('/auth');
@@ -59,13 +59,17 @@ const ShareExperience = () => {
     setLoading(true);
     try {
       const experienceData = {
-        ...experience,
+        destination: experience.destination,
+        tripDate: experience.tripDate,
+        title: experience.title,
+        description: experience.description,
+        highlights: experience.highlights.filter(h => h.length > 0),
+        tips: experience.tips.filter(t => t.length > 0),
+        photos: experience.photos.filter(p => p.length > 0),
+        rating: Number(experience.rating),
         userId: currentUser.uid,
         userName: currentUser.displayName || 'Anonymous',
-        userEmail: currentUser.email,
-        highlights: experience.highlights.filter(h => h.trim() !== ''),
-        tips: experience.tips.filter(t => t.trim() !== ''),
-        photos: experience.photos.filter(p => p.trim() !== '')
+        userEmail: currentUser.email
       };
 
       await addDocument('experiences', experienceData);

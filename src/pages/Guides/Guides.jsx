@@ -137,7 +137,7 @@ const Guides = () => {
 
   const handleCreateGuide = async (e) => {
     e.preventDefault();
-    
+
     if (!currentUser) {
       alert('Please sign in to create a guide');
       navigate('/auth');
@@ -146,15 +146,19 @@ const Guides = () => {
 
     try {
       const guideData = {
-        ...newGuide,
+        title: newGuide.title,
+        destination: newGuide.destination,
+        description: newGuide.description,
+        duration: newGuide.duration,
+        budget: newGuide.budget,
+        attractions: newGuide.attractions.filter(a => a.length > 0),
+        tips: newGuide.tips.filter(t => t.length > 0),
         author: currentUser.displayName || 'Anonymous',
         authorEmail: currentUser.email,
         userId: currentUser.uid,
         rating: 0,
         views: 0,
-        likes: 0,
-        attractions: newGuide.attractions.filter(a => a.trim() !== ''),
-        tips: newGuide.tips.filter(t => t.trim() !== '')
+        likes: 0
       };
 
       await addDocument('guides', guideData);

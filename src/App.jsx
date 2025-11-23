@@ -15,8 +15,8 @@ import Results from './pages/Results/Results';
 import Itinerary from './pages/Itinerary/Itinerary';
 import Profile from './pages/Profile/Profile';
 import Discover from './pages/Discover/Discover';
-import Guides from './pages/Guides/Guides';
-import GuideDetail from './pages/GuideDetail/GuideDetail';
+// import Guides from './pages/Guides/Guides';
+// import GuideDetail from './pages/GuideDetail/GuideDetail';
 import ShareExperience from './pages/ShareExperience/ShareExperience';
 
 function App() {
@@ -29,8 +29,8 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/discover" element={<Discover />} />
-            <Route path="/guides" element={<Guides />} />
-            <Route path="/guides/:id" element={<GuideDetail />} />
+            {/* <Route path="/guides" element={<Guides />} /> */}
+            {/* <Route path="/guides/:id" element={<GuideDetail />} /> */}
             <Route path="/search" element={<Search />} />
             <Route path="/results" element={<Results />} />
             <Route 

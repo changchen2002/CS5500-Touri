@@ -80,13 +80,13 @@ const Itinerary = () => {
 
   // Generate mock itinerary as fallback
   const generateMockItinerary = (data) => {
-    setTimeout(() => {
-      const destination = data.searchData?.destination || data.searchData?.location || 'Destination';
-      const startDate = data.searchData?.departDate || data.searchData?.checkIn;
-      const endDate = data.searchData?.returnDate || data.searchData?.checkOut;
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      const numDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) || 3;
+    // Remove setTimeout - generate instantly!
+    const destination = data.searchData?.destination || data.searchData?.location || 'Destination';
+    const startDate = data.searchData?.departDate || data.searchData?.checkIn;
+    const endDate = data.searchData?.returnDate || data.searchData?.checkOut;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const numDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) || 3;
 
       const mockItinerary = {
         id: `ITN-${Date.now()}`,
@@ -205,7 +205,6 @@ const Itinerary = () => {
 
       setItinerary(mockItinerary);
       setLoading(false);
-    }, 2000);
   };
 
   // Generate itinerary using Gemini API

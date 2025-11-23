@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getDocument, updateDocument } from '../../firebase/firestore';
+import { getDocuments, updateDocument } from '../../firebase/firestore';
 import './GuideDetail.css';
 
 const GuideDetail = () => {
@@ -15,23 +15,24 @@ const GuideDetail = () => {
 
   const loadGuide = useCallback(async () => {
     try {
-      const fetchedGuide = await getDocument('guides', id);
-      setGuide(fetchedGuide);
+      // Fetch all guides and find the one with matching ID
+      // This approach works with Firestore rules that allow public read
+      const allGuides = await getDocuments('guides');
+      const fetchedGuide = allGuides.find(g => g.id === id);
+
+      if (fetchedGuide) {
+        setGuide(fetchedGuide);
+      } else {
+        throw new Error('Guide not found');
+      }
     } catch (error) {
       console.error('Error loading guide:', error);
-      // Fallback to mock data if Firestore fails
-      setGuide({
-        id: id,
-        title: 'Sample Guide',
-        destination: 'Sample Destination',
-        description: 'This is a sample guide',
-        attractions: [],
-        tips: []
-      });
+      alert('Failed to load guide. It may have been deleted or you may not have permission to view it.');
+      navigate('/guides');
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, navigate]);
 
   useEffect(() => {
     if (!guide) {

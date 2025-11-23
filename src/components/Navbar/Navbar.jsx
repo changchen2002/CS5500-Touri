@@ -60,11 +60,6 @@ const Navbar = () => {
           {currentUser ? (
             <>
               <li className="navbar-item">
-                <Link to="/itinerary" className="navbar-link" onClick={() => setMenuOpen(false)}>
-                  Itinerary
-                </Link>
-              </li>
-              <li className="navbar-item">
                 <Link to="/profile" className="navbar-link" onClick={() => setMenuOpen(false)}>
                   Profile
                 </Link>

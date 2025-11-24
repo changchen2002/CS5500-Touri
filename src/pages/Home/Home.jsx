@@ -1,39 +1,53 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getDocuments } from '../../firebase/firestore';
 import './Home.css';
 
 const Home = () => {
   const navigate = useNavigate();
+  const [popularExperiences, setPopularExperiences] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const popularGuides = [
-    {
-      id: '1',
-      title: 'Paris in 3 Days - A Complete Guide',
-      destination: 'Paris, France',
-      author: 'Sarah Johnson',
-      rating: 4.9,
-      views: 1250,
-      likes: 89
-    },
-    {
-      id: '2',
-      title: 'Tokyo Adventure: Culture & Technology',
-      destination: 'Tokyo, Japan',
-      author: 'Mike Chen',
-      rating: 4.8,
-      views: 980,
-      likes: 72
-    },
-    {
-      id: '3',
-      title: 'Bali on a Budget',
-      destination: 'Bali, Indonesia',
-      author: 'Emma Wilson',
-      rating: 4.7,
-      views: 1560,
-      likes: 124
-    }
-  ];
+  useEffect(() => {
+    const loadPopularExperiences = async () => {
+      try {
+        const experiences = await getDocuments('experiences');
+        
+        // Sort by rating and likes, then take top 3
+        const sortedExperiences = experiences
+          .sort((a, b) => {
+            // Primary sort by rating
+            if (b.rating !== a.rating) {
+              return (b.rating || 0) - (a.rating || 0);
+            }
+            // Secondary sort by createdAt (newest first)
+            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+            return dateB - dateA;
+          })
+          .slice(0, 3);
+        
+        setPopularExperiences(sortedExperiences);
+      } catch (error) {
+        console.error('Error loading experiences:', error);
+        setPopularExperiences([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadPopularExperiences();
+  }, []);
+
+  const handleExperienceClick = (experience) => {
+    // Navigate to experience detail page, passing the experience data and referrer
+    navigate(`/experience/${experience.id}`, { 
+      state: { 
+        experience,
+        from: 'home'
+      } 
+    });
+  };
 
   return (
     <div className="home-container">
@@ -41,7 +55,7 @@ const Home = () => {
         <div className="hero-content">
           <h1 className="hero-title">Plan Your Perfect Journey</h1>
           <p className="hero-subtitle">
-            Discover destinations, explore community-created tour guides, and generate personalized itineraries using AI
+            Discover destinations, explore community-created travel experiences, and generate personalized itineraries using AI
           </p>
           <div className="hero-buttons">
             <button 
@@ -65,36 +79,78 @@ const Home = () => {
 
       <section className="popular-guides-section">
         <div className="section-header">
-          <h2 className="section-title">Popular Community Guides</h2>
-          <button className="view-all-btn" onClick={() => navigate('/guides')}>
-            View All Guides →
+          <h2 className="section-title">Popular Travel Experiences</h2>
+          <button className="view-all-btn" onClick={() => navigate('/discover')}>
+            Discover More →
           </button>
         </div>
-        <div className="guides-preview-grid">
-          {popularGuides.map(guide => (
-            <div
-              key={guide.id}
-              className="guide-preview-card"
-              onClick={() => navigate(`/guides/${guide.id}`)}
-            >
-              <div className="guide-preview-header">
-                <h3>{guide.title}</h3>
-                <div className="guide-preview-rating">
-                  <span className="stars">{'⭐'.repeat(Math.floor(guide.rating))}</span>
-                  <span>{guide.rating}</span>
+        
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#666' }}>
+            Loading experiences...
+          </div>
+        ) : popularExperiences.length > 0 ? (
+          <div className="guides-preview-grid">
+            {popularExperiences.map(experience => (
+              <div
+                key={experience.id}
+                className="guide-preview-card"
+                onClick={() => handleExperienceClick(experience)}
+                style={{ cursor: 'pointer' }}
+              >
+                <div className="guide-preview-header">
+                  <h3>{experience.title || experience.destination}</h3>
+                  <div className="guide-preview-rating">
+                    <span className="stars">{'⭐'.repeat(experience.rating || 0)}</span>
+                    <span>{experience.rating || 0}</span>
+                  </div>
+                </div>
+                <div className="guide-preview-location">
+                  <span>📍</span>
+                  <span>{experience.destination}</span>
+                </div>
+                <div className="guide-preview-footer">
+                  <span>By {experience.userName || 'Anonymous'}</span>
+                  <span>
+                    {experience.tripDate && (
+                      <>📅 {new Date(experience.tripDate).toLocaleDateString()}</>
+                    )}
+                  </span>
                 </div>
               </div>
-              <div className="guide-preview-location">
-                <span>📍</span>
-                <span>{guide.destination}</span>
-              </div>
-              <div className="guide-preview-footer">
-                <span>By {guide.author}</span>
-                <span>❤️ {guide.likes} • 👁️ {guide.views}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ 
+            textAlign: 'center', 
+            padding: '3rem', 
+            background: 'white',
+            borderRadius: '12px',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.08)'
+          }}>
+            <p style={{ fontSize: '1.2rem', color: '#666', marginBottom: '1rem' }}>
+              No experiences shared yet
+            </p>
+            <p style={{ color: '#999' }}>
+              Be the first to share your travel story!
+            </p>
+            <button 
+              style={{
+                marginTop: '1rem',
+                padding: '0.75rem 1.5rem',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: '600'
+              }}
+              onClick={() => navigate('/share-experience')}
+            >
+              Share Your Experience
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="features-section">
@@ -103,13 +159,7 @@ const Home = () => {
           <div className="feature-card">
             <div className="feature-icon">🌍</div>
             <h3>Discover Destinations</h3>
-            <p>Browse popular destinations, explore travel guides, and get inspired for your next adventure.</p>
-          </div>
-          
-          <div className="feature-card">
-            <div className="feature-icon">👥</div>
-            <h3>Community Guides</h3>
-            <p>Explore guides created by fellow travelers or create and share your own travel experiences.</p>
+            <p>Browse popular destinations, explore travel experiences, and get inspired for your next adventure.</p>
           </div>
           
           <div className="feature-card">
@@ -128,6 +178,12 @@ const Home = () => {
             <div className="feature-icon">📝</div>
             <h3>Share Experiences</h3>
             <p>Share your travel experiences after your trip to help other travelers plan their journeys.</p>
+          </div>
+          
+          <div className="feature-card">
+            <div className="feature-icon">👥</div>
+            <h3>Community Insights</h3>
+            <p>Learn from real travelers' experiences, tips, and recommendations from destinations worldwide.</p>
           </div>
           
           <div className="feature-card">
@@ -150,9 +206,9 @@ const Home = () => {
           </button>
           <button 
             className="cta-button secondary"
-            onClick={() => navigate('/guides')}
+            onClick={() => navigate('/discover')}
           >
-            Browse Guides
+            Discover Experiences
           </button>
         </div>
       </section>

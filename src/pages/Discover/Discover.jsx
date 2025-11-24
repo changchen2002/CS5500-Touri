@@ -60,8 +60,18 @@ const Discover = () => {
     return matchesSearch && matchesCategory;
   });
 
-  const handleExploreDestination = (destination) => {
+  const handleExploreDestination = (e, destination) => {
+    e.stopPropagation(); // Prevent card click
     navigate('/search', { state: { destination } });
+  };
+
+  const handleViewExperience = (experience) => {
+    navigate(`/experience/${experience.id}`, { 
+      state: { 
+        experience,
+        from: 'discover'
+      } 
+    });
   };
 
   return (
@@ -101,7 +111,12 @@ const Discover = () => {
       ) : filteredExperiences.length > 0 ? (
         <div className="destinations-grid">
           {filteredExperiences.map(experience => (
-            <div key={experience.id} className="destination-card">
+            <div 
+              key={experience.id} 
+              className="destination-card"
+              onClick={() => handleViewExperience(experience)}
+              style={{ cursor: 'pointer' }}
+            >
               <div className="destination-header">
                 <div className="destination-icon">
                   {experience.photos && experience.photos.length > 0 && experience.photos[0] ? (
@@ -127,6 +142,12 @@ const Discover = () => {
                 <div className="destination-meta">
                   <span className="meta-tag">{getCategory(experience.destination)}</span>
                   <span className="meta-tag">📍 {experience.destination}</span>
+                  {experience.duration && (
+                    <span className="meta-tag">⏱️ {experience.duration}</span>
+                  )}
+                  {experience.budget && (
+                    <span className="meta-tag">💰 {experience.budget}</span>
+                  )}
                 </div>
 
                 {experience.highlights && experience.highlights.length > 0 && (
@@ -155,18 +176,16 @@ const Discover = () => {
               <div className="destination-actions">
                 <button
                   className="action-btn primary"
-                  onClick={() => handleExploreDestination(experience.destination)}
+                  onClick={() => handleViewExperience(experience)}
+                >
+                  View Details
+                </button>
+                <button
+                  className="action-btn secondary"
+                  onClick={(e) => handleExploreDestination(e, experience.destination)}
                 >
                   Plan Trip Here
                 </button>
-                {experience.tips && experience.tips.length > 0 && (
-                  <button
-                    className="action-btn secondary"
-                    onClick={() => alert(`Tips:\n\n${experience.tips.join('\n\n')}`)}
-                  >
-                    View Tips
-                  </button>
-                )}
               </div>
             </div>
           ))}
@@ -186,3 +205,4 @@ const Discover = () => {
 };
 
 export default Discover;
+

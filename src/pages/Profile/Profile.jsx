@@ -12,20 +12,25 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [editingExperience, setEditingExperience] = useState(null);
   const [editFormData, setEditFormData] = useState(null);
+  const [notification, setNotification] = useState(null);
+
+  // Show notification helper
+  const showNotification = (message, type = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification(null), 3000);
+  };
 
   const loadSavedItineraries = useCallback(async () => {
     try {
-      // Query without orderBy to avoid needing a composite index
       const itineraries = await queryDocuments(
         'itineraries',
         [{ field: 'userId', operator: '==', value: currentUser.uid }]
       );
       
-      // Sort by createdAt in JavaScript (newest first)
       const sortedItineraries = itineraries.sort((a, b) => {
         const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
         const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-        return dateB - dateA; // Descending order (newest first)
+        return dateB - dateA;
       });
       
       setSavedItineraries(sortedItineraries);
@@ -37,17 +42,15 @@ const Profile = () => {
 
   const loadSharedExperiences = useCallback(async () => {
     try {
-      // Query without orderBy to avoid needing a composite index
       const experiences = await queryDocuments(
         'experiences',
         [{ field: 'userId', operator: '==', value: currentUser.uid }]
       );
       
-      // Sort by createdAt in JavaScript (newest first)
       const sortedExperiences = experiences.sort((a, b) => {
         const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
         const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-        return dateB - dateA; // Descending order (newest first)
+        return dateB - dateA;
       });
       
       setSharedExperiences(sortedExperiences);
@@ -73,12 +76,11 @@ const Profile = () => {
 
     try {
       await deleteDocument('experiences', experienceId);
-      alert('Experience deleted successfully!');
-      // Reload experiences to reflect the deletion
+      showNotification('Experience deleted successfully!', 'success');
       loadSharedExperiences();
     } catch (error) {
       console.error('Error deleting experience:', error);
-      alert('Failed to delete experience. Please try again.');
+      showNotification('Failed to delete experience. Please try again.', 'error');
     }
   };
 
@@ -89,12 +91,11 @@ const Profile = () => {
 
     try {
       await deleteDocument('itineraries', itineraryId);
-      alert('Itinerary deleted successfully!');
-      // Reload itineraries to reflect the deletion
+      showNotification('Itinerary deleted successfully!', 'success');
       loadSavedItineraries();
     } catch (error) {
       console.error('Error deleting itinerary:', error);
-      alert('Failed to delete itinerary. Please try again.');
+      showNotification('Failed to delete itinerary. Please try again.', 'error');
     }
   };
 
@@ -105,10 +106,19 @@ const Profile = () => {
       tripDate: experience.tripDate || '',
       title: experience.title || '',
       description: experience.description || '',
-      highlights: experience.highlights || [''],
-      photos: experience.photos || [''],
+      duration: experience.duration || '',
+      budget: experience.budget || '',
+      totalExpense: experience.totalExpense || '',
+      highlights: experience.highlights && experience.highlights.length > 0 ? experience.highlights : [''],
+      photos: experience.photos && experience.photos.length > 0 ? experience.photos : [''],
       rating: experience.rating || 5,
-      tips: experience.tips || ['']
+      tips: experience.tips && experience.tips.length > 0 ? experience.tips : [''],
+      itinerary: experience.itinerary && experience.itinerary.length > 0 
+        ? experience.itinerary 
+        : [{ day: 1, activities: '' }],
+      expenses: experience.expenses && experience.expenses.length > 0
+        ? experience.expenses
+        : [{ category: '', amount: '' }]
     });
   };
 
@@ -131,10 +141,42 @@ const Profile = () => {
     }));
   };
 
+  const handleEditItineraryChange = (index, field, value) => {
+    setEditFormData(prev => ({
+      ...prev,
+      itinerary: prev.itinerary.map((item, i) => 
+        i === index ? { ...item, [field]: value } : item
+      )
+    }));
+  };
+
+  const handleEditExpenseChange = (index, field, value) => {
+    setEditFormData(prev => ({
+      ...prev,
+      expenses: prev.expenses.map((item, i) => 
+        i === index ? { ...item, [field]: value } : item
+      )
+    }));
+  };
+
   const addEditArrayField = (field) => {
     setEditFormData(prev => ({
       ...prev,
       [field]: [...prev[field], '']
+    }));
+  };
+
+  const addEditItineraryDay = () => {
+    setEditFormData(prev => ({
+      ...prev,
+      itinerary: [...prev.itinerary, { day: prev.itinerary.length + 1, activities: '' }]
+    }));
+  };
+
+  const addEditExpense = () => {
+    setEditFormData(prev => ({
+      ...prev,
+      expenses: [...prev.expenses, { category: '', amount: '' }]
     }));
   };
 
@@ -143,6 +185,24 @@ const Profile = () => {
       ...prev,
       [field]: prev[field].filter((_, i) => i !== index)
     }));
+  };
+
+  const removeEditItineraryDay = (index) => {
+    if (editFormData.itinerary.length > 1) {
+      setEditFormData(prev => ({
+        ...prev,
+        itinerary: prev.itinerary.filter((_, i) => i !== index)
+      }));
+    }
+  };
+
+  const removeEditExpense = (index) => {
+    if (editFormData.expenses.length > 1) {
+      setEditFormData(prev => ({
+        ...prev,
+        expenses: prev.expenses.filter((_, i) => i !== index)
+      }));
+    }
   };
 
   const handleUpdateExperience = async (e) => {
@@ -154,20 +214,26 @@ const Profile = () => {
         tripDate: editFormData.tripDate,
         title: editFormData.title,
         description: editFormData.description,
+        duration: editFormData.duration,
+        budget: editFormData.budget,
+        totalExpense: editFormData.totalExpense ? Number(editFormData.totalExpense) : null,
         highlights: editFormData.highlights.filter(h => h.length > 0),
         tips: editFormData.tips.filter(t => t.length > 0),
         photos: editFormData.photos.filter(p => p.length > 0),
-        rating: Number(editFormData.rating)
+        rating: Number(editFormData.rating),
+        itinerary: editFormData.itinerary.filter(i => i.activities.length > 0),
+        expenses: editFormData.expenses.filter(e => e.category && e.amount),
+        updatedAt: new Date().toISOString()
       };
 
       await updateDocument('experiences', editingExperience, updatedData);
-      alert('Experience updated successfully!');
+      showNotification('Experience updated successfully! 🎉', 'success');
       setEditingExperience(null);
       setEditFormData(null);
       loadSharedExperiences();
     } catch (error) {
       console.error('Error updating experience:', error);
-      alert('Failed to update experience. Please try again.');
+      showNotification('Failed to update experience. Please try again.', 'error');
     }
   };
 
@@ -396,6 +462,42 @@ const Profile = () => {
                   />
                 </div>
 
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Duration</label>
+                    <input
+                      type="text"
+                      value={editFormData.duration}
+                      onChange={(e) => handleEditFormChange('duration', e.target.value)}
+                      placeholder="e.g., 5 days, 1 week"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Budget Level</label>
+                    <select
+                      value={editFormData.budget}
+                      onChange={(e) => handleEditFormChange('budget', e.target.value)}
+                    >
+                      <option value="">Select budget</option>
+                      <option value="$">$ - Budget</option>
+                      <option value="$$">$$ - Moderate</option>
+                      <option value="$$$">$$$ - Expensive</option>
+                      <option value="$$$$">$$$$ - Luxury</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label>Total Expense (Optional)</label>
+                  <input
+                    type="number"
+                    value={editFormData.totalExpense}
+                    onChange={(e) => handleEditFormChange('totalExpense', e.target.value)}
+                    placeholder="Total amount spent (in USD)"
+                    min="0"
+                  />
+                </div>
+
                 <div className="form-group">
                   <label>Overall Rating</label>
                   <div className="rating-input">
@@ -427,6 +529,85 @@ const Profile = () => {
                     required
                   />
                 </div>
+              </div>
+
+              <div className="form-section">
+                <h3>Daily Itinerary</h3>
+                <p className="helper-text">Share what you did each day of your trip</p>
+                
+                {editFormData.itinerary.map((day, index) => (
+                  <div key={index} className="itinerary-day-group">
+                    <div className="day-header">
+                      <h4>Day {day.day}</h4>
+                      {editFormData.itinerary.length > 1 && (
+                        <button
+                          type="button"
+                          className="remove-btn"
+                          onClick={() => removeEditItineraryDay(index)}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                    <textarea
+                      value={day.activities}
+                      onChange={(e) => handleEditItineraryChange(index, 'activities', e.target.value)}
+                      placeholder="Describe what you did on this day..."
+                      rows="3"
+                      className="itinerary-textarea"
+                    />
+                  </div>
+                ))}
+                
+                <button
+                  type="button"
+                  className="add-field-btn"
+                  onClick={addEditItineraryDay}
+                >
+                  + Add Day
+                </button>
+              </div>
+
+              <div className="form-section">
+                <h3>Expense Breakdown</h3>
+                <p className="helper-text">Share how you spent your budget (Optional)</p>
+                
+                {editFormData.expenses.map((expense, index) => (
+                  <div key={index} className="expense-row">
+                    <input
+                      type="text"
+                      value={expense.category}
+                      onChange={(e) => handleEditExpenseChange(index, 'category', e.target.value)}
+                      placeholder="Category (e.g., Accommodation, Food, Transport)"
+                      className="expense-category"
+                    />
+                    <input
+                      type="number"
+                      value={expense.amount}
+                      onChange={(e) => handleEditExpenseChange(index, 'amount', e.target.value)}
+                      placeholder="Amount ($)"
+                      min="0"
+                      className="expense-amount"
+                    />
+                    {editFormData.expenses.length > 1 && (
+                      <button
+                        type="button"
+                        className="remove-btn"
+                        onClick={() => removeEditExpense(index)}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+                
+                <button
+                  type="button"
+                  className="add-field-btn"
+                  onClick={addEditExpense}
+                >
+                  + Add Expense
+                </button>
               </div>
 
               <div className="form-section">
@@ -545,6 +726,18 @@ const Profile = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Notification Toast */}
+      {notification && (
+        <div className={`notification-toast ${notification.type}`}>
+          <div className="notification-content">
+            <span className="notification-icon">
+              {notification.type === 'success' ? '✅' : '❌'}
+            </span>
+            <span className="notification-message">{notification.message}</span>
           </div>
         </div>
       )}

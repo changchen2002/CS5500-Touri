@@ -13,13 +13,7 @@ const Discover = () => {
   const loadExperiences = useCallback(async () => {
     try {
       const fetchedExperiences = await getDocuments('experiences');
-      // Sort by creation date (newest first)
-      const sortedExperiences = fetchedExperiences.sort((a, b) => {
-        const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
-        const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
-        return dateB - dateA;
-      });
-      setExperiences(sortedExperiences);
+      setExperiences(fetchedExperiences);
     } catch (error) {
       console.error('Error loading experiences:', error);
       setExperiences([]);
@@ -140,9 +134,9 @@ const Discover = () => {
               <div className="destination-content">
                 <h3>{experience.title || experience.destination}</h3>
                 <p className="destination-description">
-                  {experience.description && experience.description.length > 150
+                  {experience.description.length > 150
                     ? `${experience.description.substring(0, 150)}...`
-                    : experience.description || 'No description available'}
+                    : experience.description}
                 </p>
 
                 <div className="destination-meta">
@@ -170,11 +164,7 @@ const Discover = () => {
                 {experience.tripDate && (
                   <div className="destination-timing">
                     <span className="timing-icon">📅</span>
-                    <span>Visited: {
-                      experience.tripDate?.toDate 
-                        ? experience.tripDate.toDate().toLocaleDateString()
-                        : new Date(experience.tripDate).toLocaleDateString()
-                    }</span>
+                    <span>Visited: {new Date(experience.tripDate).toLocaleDateString()}</span>
                   </div>
                 )}
 

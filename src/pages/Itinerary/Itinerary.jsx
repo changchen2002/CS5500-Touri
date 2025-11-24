@@ -1,34 +1,97 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { addDocument } from '../../firebase/firestore';
+import { addDocument, queryDocuments } from '../../firebase/firestore';
 import { generateItineraryPDF } from '../../utils/pdfGenerator';
 import './Itinerary.css';
 
 const Itinerary = () => {
   const navigate = useNavigate();
-  const { currentUser } = useAuth();
+  const { id } = useParams();
+  const { currentUser, loading: authLoading } = useAuth();
   const [itinerary, setItinerary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const data = sessionStorage.getItem('selections');
-    if (data) {
-      const parsedData = JSON.parse(data);
-      generateItinerary(parsedData);
-    } else {
-      navigate('/results');
-    }
-  }, [navigate]);
+    const loadItinerary = async () => {
+      // If there's an ID in the route, load from Firestore (saved itinerary)
+      if (id) {
+        // Wait for auth to finish loading
+        if (authLoading) {
+          return;
+        }
+        
+        // Wait for currentUser to be available
+        if (!currentUser) {
+          alert('Please sign in to view saved itineraries.');
+          navigate('/auth');
+          return;
+        }
 
-  const generateItinerary = (data) => {
-    setTimeout(() => {
+        try {
+          // Use queryDocuments instead of getDocument to work with Firestore rules
+          // Query for the specific itinerary ID with userId filter to ensure user owns it
+          const results = await queryDocuments(
+            'itineraries',
+            [
+              { field: 'userId', operator: '==', value: currentUser.uid }
+            ]
+          );
+          
+          // Find the itinerary with matching ID
+          const savedItinerary = results.find(it => it.id === id);
+          
+          if (!savedItinerary) {
+            throw new Error('Itinerary not found or you do not have permission to view it.');
+          }
+          
+          // The itinerary is already complete from Firestore - use it directly
+          // No need to generate, just display what we fetched
+          setItinerary(savedItinerary);
+          setLoading(false);
+        } catch (error) {
+          let errorMessage = 'Failed to load itinerary.';
+          if (error.code === 'permission-denied' || error.code === 'PERMISSION_DENIED') {
+            errorMessage = 'Permission denied. Please make sure you are signed in and own this itinerary.';
+          } else if (error.message?.includes('not found') || error.code === 'not-found') {
+            errorMessage = 'Itinerary not found. It may have been deleted.';
+          } else {
+            errorMessage = `Error: ${error.message || 'Unknown error'}`;
+          }
+          
+          alert(errorMessage);
+          navigate('/profile');
+        }
+      } else {
+        // Otherwise, check sessionStorage for newly generated itinerary
+        const data = sessionStorage.getItem('selections');
+        if (data) {
+          const parsedData = JSON.parse(data);
+          generateItinerary(parsedData);
+        } else {
+          navigate('/results');
+        }
+      }
+    };
+
+    loadItinerary();
+  }, [id, navigate, currentUser, authLoading]);
+
+  // Generate mock itinerary as fallback
+  const generateMockItinerary = (data) => {
+    const destination = data.searchData?.destination || data.searchData?.location || 'Destination';
+    const startDate = data.searchData?.departDate || data.searchData?.checkIn;
+    const endDate = data.searchData?.returnDate || data.searchData?.checkOut;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const numDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) || 3;
+
       const mockItinerary = {
         id: `ITN-${Date.now()}`,
-        destination: data.searchData?.destination || data.searchData?.location || 'Destination',
-        startDate: data.searchData?.departDate || data.searchData?.checkIn,
-        endDate: data.searchData?.returnDate || data.searchData?.checkOut,
+        destination: destination,
+        startDate: startDate,
+        endDate: endDate,
         flight: data.flight,
         hotel: data.hotel,
         dailyPlans: [
@@ -39,7 +102,7 @@ const Itinerary = () => {
               {
                 time: '09:00 AM',
                 activity: 'Arrival & Hotel Check-in',
-                description: `Arrive at ${data.hotel.name}, check-in and freshen up`,
+                description: `Arrive at ${data.hotel?.name || 'hotel'}, check-in and freshen up`,
                 type: 'accommodation'
               },
               {
@@ -99,7 +162,7 @@ const Itinerary = () => {
             ]
           },
           {
-            day: 3,
+            day: numDays,
             title: 'Departure Day',
             activities: [
               {
@@ -123,19 +186,171 @@ const Itinerary = () => {
               {
                 time: '02:00 PM',
                 activity: 'Airport Transfer',
-                description: `Depart for airport for ${data.flight.flightNumber} flight`,
+                description: `Depart for airport for ${data.flight?.flightNumber || 'your'} flight`,
                 type: 'transport'
               }
             ]
           }
         ],
-        totalCost: data.flight.price + (data.hotel.pricePerNight * 2),
+        travelTips: [
+          'Consider local weather and peak tourist seasons when planning activities',
+          'Don\'t miss trying authentic local dishes and visiting popular food markets',
+          'Popular attractions may require advance booking - check online',
+          'Research local public transport options or consider ride-sharing apps'
+        ],
+        totalCost: (data.flight?.price || 0) + ((data.hotel?.pricePerNight || 0) * numDays),
         createdAt: new Date().toISOString()
       };
 
       setItinerary(mockItinerary);
       setLoading(false);
-    }, 2000);
+  };
+
+  // Generate itinerary using Gemini API
+  const generateItineraryWithGemini = async (data) => {
+    try {
+      const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
+      
+      if (!apiKey) {
+        generateMockItinerary(data);
+        return;
+      }
+
+      const destination = data.searchData?.destination || data.searchData?.location || 'Destination';
+      const startDate = data.searchData?.departDate || data.searchData?.checkIn;
+      const endDate = data.searchData?.returnDate || data.searchData?.checkOut;
+      
+      // Calculate number of days
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const numDays = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) || 3;
+
+      // Build prompt for Gemini
+      const prompt = `Create a detailed ${numDays}-day travel itinerary for ${destination} based on the following information:
+
+Flight Details:
+- Airline: ${data.flight?.airline || 'N/A'}
+- Flight Number: ${data.flight?.flightNumber || 'N/A'}
+- Departure Time: ${data.flight?.departure || 'N/A'}
+- Arrival Time: ${data.flight?.arrival || 'N/A'}
+${data.flight?.returnDeparture ? `- Return Flight: Departure ${data.flight.returnDeparture}, Arrival ${data.flight.returnArrival}` : ''}
+
+Hotel Details:
+- Name: ${data.hotel?.name || 'N/A'}
+- Location: ${data.hotel?.address || data.hotel?.distance || 'N/A'}
+- Rating: ${data.hotel?.rating || 'N/A'}/5
+
+Travel Dates: ${startDate} to ${endDate} (${numDays} days)
+
+Please create a detailed daily itinerary with:
+1. Day-by-day plans with creative, descriptive titles
+2. Specific activities with times (format: "HH:MM AM/PM")
+3. Detailed activity descriptions
+4. Activity types: accommodation, dining, sightseeing, activity, or transport
+5. Include arrival day activities, main exploration days, and departure day
+6. Make activities realistic and culturally relevant to ${destination}
+
+Return the response as a valid JSON object with this exact structure:
+{
+  "dailyPlans": [
+    {
+      "day": 1,
+      "title": "Creative day title",
+      "activities": [
+        {
+          "time": "09:00 AM",
+          "activity": "Activity name",
+          "description": "Detailed description of the activity",
+          "type": "accommodation"
+        }
+      ]
+    }
+  ],
+  "travelTips": [
+    "Practical tip 1",
+    "Practical tip 2",
+    "Practical tip 3",
+    "Practical tip 4"
+  ]
+}
+
+Make it realistic, culturally relevant, and include popular attractions and local experiences for ${destination}. Only return valid JSON, no markdown or additional text.`;
+
+      // Call Gemini API
+      // Try different model names in case one is unavailable
+      const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-pro', 'gemini-1.0-pro'];
+      let response;
+      let lastError;
+      
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+          
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: prompt
+            }]
+          }]
+        })
+      });
+
+      if (!response) {
+        throw new Error(`Failed to connect to Gemini API: ${lastError?.message || 'All models unavailable. Please check your API key and available models.'}`);
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        const errorMessage = errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(`Gemini API error: ${errorMessage}`);
+      }
+
+      const result = await response.json();
+      
+      // Extract text from Gemini response
+      const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      
+      // Try to parse JSON from the response
+      let itineraryData;
+      try {
+        // Extract JSON from markdown code blocks if present
+        const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/) || 
+                         responseText.match(/```\s*([\s\S]*?)\s*```/) ||
+                         [null, responseText];
+        const jsonText = jsonMatch[1] || responseText;
+        itineraryData = JSON.parse(jsonText.trim());
+      } catch (parseError) {
+        generateMockItinerary(data);
+        return;
+      }
+
+      // Build the itinerary object
+      const generatedItinerary = {
+        id: `ITN-${Date.now()}`,
+        destination: destination,
+        startDate: startDate,
+        endDate: endDate,
+        flight: data.flight,
+        hotel: data.hotel,
+        dailyPlans: itineraryData.dailyPlans || [],
+        travelTips: itineraryData.travelTips || [],
+        totalCost: (data.flight?.price || 0) + ((data.hotel?.pricePerNight || 0) * numDays),
+        createdAt: new Date().toISOString()
+      };
+
+      setItinerary(generatedItinerary);
+      setLoading(false);
+    } catch (error) {
+      // Fall back to mock itinerary on error
+      generateMockItinerary(data);
+    }
+  };
+
+  const generateItinerary = (data) => {
+    generateItineraryWithGemini(data);
   };
 
   const handleSaveItinerary = async () => {
@@ -145,17 +360,25 @@ const Itinerary = () => {
       return;
     }
 
+    if (!itinerary) {
+      alert('No itinerary to save. Please generate an itinerary first.');
+      return;
+    }
+
     setSaving(true);
     try {
-      await addDocument('itineraries', {
+      const itineraryData = {
         ...itinerary,
         userId: currentUser.uid,
         userEmail: currentUser.email
-      });
-      alert('Itinerary saved successfully!');
+      };
+      
+      await addDocument('itineraries', itineraryData);
+      
+      alert('Itinerary saved successfully! You can view it in your saved itineraries.');
     } catch (error) {
-      console.error('Error saving itinerary:', error);
-      alert('Failed to save itinerary. Please try again.');
+      const errorMessage = error.message || 'Unknown error occurred';
+      alert(`Failed to save itinerary: ${errorMessage}. Please try again.`);
     } finally {
       setSaving(false);
     }
@@ -171,7 +394,6 @@ const Itinerary = () => {
       const filename = `${itinerary.destination.replace(/\s+/g, '-')}-Itinerary-${Date.now()}.pdf`;
       await generateItineraryPDF(itinerary, filename);
     } catch (error) {
-      console.error('Error generating PDF:', error);
       alert('Failed to generate PDF. Please try again.');
     }
   };
@@ -281,26 +503,42 @@ const Itinerary = () => {
       <div className="recommendations">
         <h2>Travel Tips</h2>
         <div className="tips-grid">
-          <div className="tip-card">
-            <span className="tip-icon">💡</span>
-            <h4>Best Time to Visit</h4>
-            <p>Consider local weather and peak tourist seasons when planning activities</p>
-          </div>
-          <div className="tip-card">
-            <span className="tip-icon">🍴</span>
-            <h4>Local Cuisine</h4>
-            <p>Don't miss trying authentic local dishes and visiting popular food markets</p>
-          </div>
-          <div className="tip-card">
-            <span className="tip-icon">🎫</span>
-            <h4>Book in Advance</h4>
-            <p>Popular attractions may require advance booking - check online</p>
-          </div>
-          <div className="tip-card">
-            <span className="tip-icon">🚌</span>
-            <h4>Transportation</h4>
-            <p>Research local public transport options or consider ride-sharing apps</p>
-          </div>
+          {itinerary.travelTips && itinerary.travelTips.length > 0 ? (
+            itinerary.travelTips.map((tip, index) => {
+              const tipIcons = ['💡', '🍴', '🎫', '🚌', '🌍', '📸', '💰', '🛡️'];
+              const tipTitles = ['Best Time to Visit', 'Local Cuisine', 'Book in Advance', 'Transportation', 'Cultural Etiquette', 'Photography Tips', 'Budget Planning', 'Safety Tips'];
+              return (
+                <div key={index} className="tip-card">
+                  <span className="tip-icon">{tipIcons[index % tipIcons.length]}</span>
+                  <h4>{tipTitles[index % tipTitles.length]}</h4>
+                  <p>{tip}</p>
+                </div>
+              );
+            })
+          ) : (
+            <>
+              <div className="tip-card">
+                <span className="tip-icon">💡</span>
+                <h4>Best Time to Visit</h4>
+                <p>Consider local weather and peak tourist seasons when planning activities</p>
+              </div>
+              <div className="tip-card">
+                <span className="tip-icon">🍴</span>
+                <h4>Local Cuisine</h4>
+                <p>Don't miss trying authentic local dishes and visiting popular food markets</p>
+              </div>
+              <div className="tip-card">
+                <span className="tip-icon">🎫</span>
+                <h4>Book in Advance</h4>
+                <p>Popular attractions may require advance booking - check online</p>
+              </div>
+              <div className="tip-card">
+                <span className="tip-icon">🚌</span>
+                <h4>Transportation</h4>
+                <p>Research local public transport options or consider ride-sharing apps</p>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

@@ -46,11 +46,11 @@ const Navbar = () => {
               Discover
             </Link>
           </li>
-          <li className="navbar-item">
+          {/* <li className="navbar-item">
             <Link to="/guides" className="navbar-link" onClick={() => setMenuOpen(false)}>
               Guides
             </Link>
-          </li>
+          </li> */}
           <li className="navbar-item">
             <Link to="/search" className="navbar-link" onClick={() => setMenuOpen(false)}>
               Search
@@ -59,11 +59,6 @@ const Navbar = () => {
           
           {currentUser ? (
             <>
-              <li className="navbar-item">
-                <Link to="/itinerary" className="navbar-link" onClick={() => setMenuOpen(false)}>
-                  Itinerary
-                </Link>
-              </li>
               <li className="navbar-item">
                 <Link to="/profile" className="navbar-link" onClick={() => setMenuOpen(false)}>
                   Profile

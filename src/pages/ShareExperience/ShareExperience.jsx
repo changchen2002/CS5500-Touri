@@ -129,8 +129,8 @@ const ShareExperience = () => {
         expenses: experience.expenses.filter(e => e.category && e.amount),
         userId: currentUser.uid,
         userName: currentUser.displayName || 'Anonymous',
-        userEmail: currentUser.email,
-        createdAt: new Date().toISOString() // Add createdAt timestamp
+        userEmail: currentUser.email
+        // createdAt will be automatically added by addDocument function in firestore.js
       };
 
       await addDocument('experiences', experienceData);

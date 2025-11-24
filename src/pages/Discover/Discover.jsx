@@ -9,9 +9,11 @@ const Discover = () => {
   const [experiences, setExperiences] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [error, setError] = useState(null);
 
   const loadExperiences = useCallback(async () => {
     try {
+      setError(null);
       const fetchedExperiences = await getDocuments('experiences');
       // Sort by creation date (newest first)
       const sortedExperiences = fetchedExperiences.sort((a, b) => {
@@ -22,6 +24,7 @@ const Discover = () => {
       setExperiences(sortedExperiences);
     } catch (error) {
       console.error('Error loading experiences:', error);
+      setError('Failed to load experiences.');
       setExperiences([]);
     } finally {
       setLoading(false);
@@ -114,6 +117,13 @@ const Discover = () => {
 
       {loading ? (
         <div className="loading-message">Loading experiences...</div>
+      ) : error ? (
+        <div className="error-message">
+          <p>{error}</p>
+          <button onClick={loadExperiences} className="retry-button">
+            Retry
+          </button>
+        </div>
       ) : filteredExperiences.length > 0 ? (
         <div className="destinations-grid">
           {filteredExperiences.map(experience => (

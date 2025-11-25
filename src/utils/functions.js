@@ -3,7 +3,7 @@
  * These functions proxy API calls to keep API keys secure on the server
  */
 
-import { app } from '../firebase/config';
+import app from '../firebase/config';
 
 // Get the Firebase Functions URLs
 // Gen2 functions use Cloud Run URLs, not the standard cloudfunctions.net URLs

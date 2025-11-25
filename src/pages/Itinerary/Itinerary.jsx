@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { addDocument, queryDocuments } from '../../firebase/firestore';
 import { generateItineraryPDF } from '../../utils/pdfGenerator';
+import { generateItineraryViaFunction } from '../../utils/functions';
 import './Itinerary.css';
 
 const Itinerary = () => {
@@ -13,73 +14,8 @@ const Itinerary = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    const loadItinerary = async () => {
-      // If there's an ID in the route, load from Firestore (saved itinerary)
-      if (id) {
-        // Wait for auth to finish loading
-        if (authLoading) {
-          return;
-        }
-        
-        // Wait for currentUser to be available
-        if (!currentUser) {
-          alert('Please sign in to view saved itineraries.');
-          navigate('/auth');
-          return;
-        }
-
-        try {
-          // Use queryDocuments instead of getDocument to work with Firestore rules
-          // Query for the specific itinerary ID with userId filter to ensure user owns it
-          const results = await queryDocuments(
-            'itineraries',
-            [
-              { field: 'userId', operator: '==', value: currentUser.uid }
-            ]
-          );
-          
-          // Find the itinerary with matching ID
-          const savedItinerary = results.find(it => it.id === id);
-          
-          if (!savedItinerary) {
-            throw new Error('Itinerary not found or you do not have permission to view it.');
-          }
-          
-          // The itinerary is already complete from Firestore - use it directly
-          // No need to generate, just display what we fetched
-          setItinerary(savedItinerary);
-          setLoading(false);
-        } catch (error) {
-          let errorMessage = 'Failed to load itinerary.';
-          if (error.code === 'permission-denied' || error.code === 'PERMISSION_DENIED') {
-            errorMessage = 'Permission denied. Please make sure you are signed in and own this itinerary.';
-          } else if (error.message?.includes('not found') || error.code === 'not-found') {
-            errorMessage = 'Itinerary not found. It may have been deleted.';
-          } else {
-            errorMessage = `Error: ${error.message || 'Unknown error'}`;
-          }
-          
-          alert(errorMessage);
-          navigate('/profile');
-        }
-      } else {
-        // Otherwise, check sessionStorage for newly generated itinerary
-        const data = sessionStorage.getItem('selections');
-        if (data) {
-          const parsedData = JSON.parse(data);
-          generateItinerary(parsedData);
-        } else {
-          navigate('/results');
-        }
-      }
-    };
-
-    loadItinerary();
-  }, [id, navigate, currentUser, authLoading]);
-
   // Generate mock itinerary as fallback
-  const generateMockItinerary = (data) => {
+  const generateMockItinerary = useCallback((data) => {
     const destination = data.searchData?.destination || data.searchData?.location || 'Destination';
     const startDate = data.searchData?.departDate || data.searchData?.checkIn;
     const endDate = data.searchData?.returnDate || data.searchData?.checkOut;
@@ -204,18 +140,11 @@ const Itinerary = () => {
 
       setItinerary(mockItinerary);
       setLoading(false);
-  };
+  }, []);
 
-  // Generate itinerary using Gemini API
-  const generateItineraryWithGemini = async (data) => {
+  // Generate itinerary using Gemini API via Firebase Functions
+  const generateItineraryWithGemini = useCallback(async (data) => {
     try {
-      const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
-      
-      if (!apiKey) {
-        generateMockItinerary(data);
-        return;
-      }
-
       const destination = data.searchData?.destination || data.searchData?.location || 'Destination';
       const startDate = data.searchData?.departDate || data.searchData?.checkIn;
       const endDate = data.searchData?.returnDate || data.searchData?.checkOut;
@@ -276,39 +205,8 @@ Return the response as a valid JSON object with this exact structure:
 
 Make it realistic, culturally relevant, and include popular attractions and local experiences for ${destination}. Only return valid JSON, no markdown or additional text.`;
 
-      // Call Gemini API
-      // Try different model names in case one is unavailable
-      const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-pro', 'gemini-1.0-pro'];
-      let response;
-      let lastError;
-      
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-          
-      response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: prompt
-            }]
-          }]
-        })
-      });
-
-      if (!response) {
-        throw new Error(`Failed to connect to Gemini API: ${lastError?.message || 'All models unavailable. Please check your API key and available models.'}`);
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        const errorMessage = errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`;
-        throw new Error(`Gemini API error: ${errorMessage}`);
-      }
-
-      const result = await response.json();
+      // Call Gemini API via Firebase Function
+      const result = await generateItineraryViaFunction(prompt);
       
       // Extract text from Gemini response
       const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
@@ -347,11 +245,76 @@ Make it realistic, culturally relevant, and include popular attractions and loca
       // Fall back to mock itinerary on error
       generateMockItinerary(data);
     }
-  };
+  }, [generateMockItinerary]);
 
-  const generateItinerary = (data) => {
+  const generateItinerary = useCallback((data) => {
     generateItineraryWithGemini(data);
-  };
+  }, [generateItineraryWithGemini]);
+
+  useEffect(() => {
+    const loadItinerary = async () => {
+      // If there's an ID in the route, load from Firestore (saved itinerary)
+      if (id) {
+        // Wait for auth to finish loading
+        if (authLoading) {
+          return;
+        }
+        
+        // Wait for currentUser to be available
+        if (!currentUser) {
+          alert('Please sign in to view saved itineraries.');
+          navigate('/auth');
+          return;
+        }
+
+        try {
+          // Use queryDocuments instead of getDocument to work with Firestore rules
+          // Query for the specific itinerary ID with userId filter to ensure user owns it
+          const results = await queryDocuments(
+            'itineraries',
+            [
+              { field: 'userId', operator: '==', value: currentUser.uid }
+            ]
+          );
+          
+          // Find the itinerary with matching ID
+          const savedItinerary = results.find(it => it.id === id);
+          
+          if (!savedItinerary) {
+            throw new Error('Itinerary not found or you do not have permission to view it.');
+          }
+          
+          // The itinerary is already complete from Firestore - use it directly
+          // No need to generate, just display what we fetched
+          setItinerary(savedItinerary);
+          setLoading(false);
+        } catch (error) {
+          let errorMessage = 'Failed to load itinerary.';
+          if (error.code === 'permission-denied' || error.code === 'PERMISSION_DENIED') {
+            errorMessage = 'Permission denied. Please make sure you are signed in and own this itinerary.';
+          } else if (error.message?.includes('not found') || error.code === 'not-found') {
+            errorMessage = 'Itinerary not found. It may have been deleted.';
+          } else {
+            errorMessage = `Error: ${error.message || 'Unknown error'}`;
+          }
+          
+          alert(errorMessage);
+          navigate('/profile');
+        }
+      } else {
+        // Otherwise, check sessionStorage for newly generated itinerary
+        const data = sessionStorage.getItem('selections');
+        if (data) {
+          const parsedData = JSON.parse(data);
+          generateItinerary(parsedData);
+        } else {
+          navigate('/results');
+        }
+      }
+    };
+
+    loadItinerary();
+  }, [id, navigate, currentUser, authLoading, generateItinerary]);
 
   const handleSaveItinerary = async () => {
     if (!currentUser) {

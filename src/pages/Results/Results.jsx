@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { fetchFlightsViaFunction, fetchHotelsViaFunction } from '../../utils/functions';
 import './Results.css';
 
 const Results = () => {
@@ -234,77 +235,13 @@ const Results = () => {
     });
   };
 
-  // Fetch hotels from SerpApi Google Hotels API
+  // Fetch hotels from SerpApi via Firebase Functions
   const fetchHotels = async (searchParams) => {
     try {
       setHotelApiError(null);
       
-      // Get API key from environment variables
-      const apiKey = process.env.REACT_APP_SERPAPI_KEY;
-      
-      if (!apiKey) {
-        throw new Error('SerpApi key not found. Please add REACT_APP_SERPAPI_KEY to your .env file.');
-      }
-
-      // Build API URL
-      const params = new URLSearchParams({
-        engine: 'google_hotels',
-        q: searchParams.location || '',
-        check_in_date: searchParams.checkIn || '',
-        check_out_date: searchParams.checkOut || '',
-        adults: searchParams.adults || 1,
-        children: searchParams.children || 0,
-        currency: searchParams.currency || 'USD',
-        gl: 'us',
-        hl: 'en',
-        api_key: apiKey
-      });
-
-      const apiUrl = `https://serpapi.com/search.json?${params.toString()}`;
-      
-      // SerpApi doesn't support CORS from browsers, so we need to use a proxy
-      // Try multiple proxy options for reliability
-      const proxyOptions = [
-        `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`,
-        `https://api.allorigins.win/raw?url=${encodeURIComponent(apiUrl)}`,
-        `https://cors-anywhere.herokuapp.com/${apiUrl}`
-      ];
-      
-      let response;
-      let lastError;
-      
-      // Try each proxy option
-      for (const proxyUrl of proxyOptions) {
-        try {
-          // Create abort controller for timeout
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-          
-          response = await fetch(proxyUrl, {
-            method: 'GET',
-            headers: {
-              'Accept': 'application/json',
-            },
-            signal: controller.signal
-          });
-          
-          clearTimeout(timeoutId);
-          
-          if (response.ok) {
-            break; // Success, exit loop
-          }
-        } catch (error) {
-          lastError = error;
-          console.log(`Proxy failed, trying next option...`, error.message);
-          continue; // Try next proxy
-        }
-      }
-      
-      if (!response || !response.ok) {
-        throw new Error(`Failed to fetch hotels: ${lastError?.message || 'All proxy options failed. SerpApi requires a backend proxy for browser requests.'}`);
-      }
-
-      const data = await response.json();
+      // Call Firebase Function to fetch hotels
+      const data = await fetchHotelsViaFunction(searchParams);
       
       // Check if API returned an error
       if (data.error) {
@@ -333,36 +270,13 @@ const Results = () => {
     }
   };
 
-  // Fetch flights from FlightAPI
+  // Fetch flights from FlightAPI via Firebase Functions
   const fetchFlights = async (searchParams) => {
     try {
       setApiError(null);
       
-      // Get API key from environment variables
-      const apiKey = process.env.REACT_APP_FLIGHTAPI_KEY;
-      
-      if (!apiKey) {
-        throw new Error('FlightAPI key not found. Please add REACT_APP_FLIGHTAPI_KEY to your .env file.');
-      }
-      
-      // Extract airport codes (uppercase, max 3 chars)
-      const departureAirport = searchParams.origin?.toUpperCase().substring(0, 3);
-      const arrivalAirport = searchParams.destination?.toUpperCase().substring(0, 3);
-      
-      // Format dates (YYYY-MM-DD)
-      const departureDate = searchParams.departDate;
-      const arrivalDate = searchParams.returnDate;
-
-      // Build API URL
-      const apiUrl = `https://api.flightapi.io/roundtrip/${apiKey}/${departureAirport}/${arrivalAirport}/${departureDate}/${arrivalDate}/${searchParams.adults || 1}/${searchParams.children || 0}/${searchParams.infants || 0}/${searchParams.cabinClass || 'Economy'}/${searchParams.currency || 'USD'}`;
-
-      const response = await fetch(apiUrl);
-      
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      // Call Firebase Function to fetch flights
+      const data = await fetchFlightsViaFunction(searchParams);
       
       // Check if API returned an error
       if (data.error || data.message) {
@@ -434,13 +348,7 @@ const Results = () => {
       
       // Fetch flights if flight parameters exist
       if (flightParams.origin && flightParams.destination && flightParams.departDate && flightParams.returnDate) {
-        const flightApiKey = process.env.REACT_APP_FLIGHTAPI_KEY;
-        if (flightApiKey && flightApiKey.trim() !== '') {
-          promises.push(fetchFlights(flightParams));
-        } else {
-          setApiError('FlightAPI key not configured. Using mock data.');
-          setFlights(mockFlights.slice(0, 5));
-        }
+        promises.push(fetchFlights(flightParams));
       } else {
         // Use mock flights if flight parameters are missing
         setFlights(mockFlights.slice(0, 5));
@@ -448,13 +356,7 @@ const Results = () => {
       
       // Fetch hotels if hotel parameters exist
       if (hotelParams.location && hotelParams.checkIn && hotelParams.checkOut) {
-        const hotelApiKey = process.env.REACT_APP_SERPAPI_KEY;
-        if (hotelApiKey && hotelApiKey.trim() !== '') {
-          promises.push(fetchHotels(hotelParams));
-        } else {
-          setHotelApiError('SerpApi key not configured. Using mock data.');
-          setHotels(mockHotels.slice(0, 5));
-        }
+        promises.push(fetchHotels(hotelParams));
       } else {
         // Use mock hotels if hotel parameters are missing
         setHotels(mockHotels.slice(0, 5));

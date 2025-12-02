@@ -83,3 +83,9 @@ temp/
 functions/node_modules/
 functions/.env
 functions/*.log
+
+# Firebase cache and deployment files
+.firebase/
+.firebaserc
+firebase-debug.log
+firebase-debug.*.log

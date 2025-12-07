@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getDocuments } from '../../firebase/firestore';
+import cuteEarth from './cute_earth.jpg';
 import './Home.css';
 
 const Home = () => {
@@ -73,7 +74,7 @@ const Home = () => {
           </div>
         </div>
         <div className="hero-image">
-          <div className="image-placeholder">🌍</div>
+          <img src={cuteEarth} alt="Earth" className="hero-image" />
         </div>
       </section>
 

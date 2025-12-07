@@ -71,7 +71,7 @@
 .form-group textarea:focus,
 .form-group select:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #333;
 }
 
 .form-row {
@@ -129,7 +129,7 @@
 
 .array-input:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #333;
 }
 
 .remove-btn {
@@ -159,7 +159,7 @@
   padding: 0.75rem 1.5rem;
   border-radius: 8px;
   cursor: pointer;
-  color: #667eea;
+  color: #333;
   font-weight: 600;
   transition: all 0.3s;
   margin-top: 0.5rem;
@@ -181,7 +181,7 @@
   padding: 1rem;
   border-radius: 8px;
   margin-bottom: 1rem;
-  border-left: 4px solid #667eea;
+  border-left: 4px solid #333;
 }
 
 .day-header {
@@ -192,7 +192,7 @@
 }
 
 .day-header h4 {
-  color: #667eea;
+  color: #333;
   font-size: 1.1rem;
   margin: 0;
 }
@@ -210,7 +210,7 @@
 
 .itinerary-textarea:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #333;
 }
 
 /* Expense Styles */
@@ -234,7 +234,7 @@
 .expense-category:focus,
 .expense-amount:focus {
   outline: none;
-  border-color: #667eea;
+  border-color: #333;
 }
 
 .form-actions {
@@ -267,7 +267,7 @@
 }
 
 .submit-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #333;
   color: white;
 }
 
@@ -295,7 +295,7 @@
 .auth-required button {
   margin-top: 1rem;
   padding: 0.75rem 1.5rem;
-  background: #667eea;
+  background: #333;
   color: white;
   border: none;
   border-radius: 8px;

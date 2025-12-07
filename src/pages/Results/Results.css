@@ -20,8 +20,8 @@
   .new-search-button {
     padding: 0.75rem 1.5rem;
     background: white;
-    border: 2px solid #667eea;
-    color: #667eea;
+    border: 2px solid #333;
+    color: #333;
     border-radius: 6px;
     cursor: pointer;
     font-weight: 600;
@@ -29,7 +29,7 @@
   }
   
   .new-search-button:hover {
-    background: #667eea;
+    background: #333;
     color: white;
   }
   
@@ -84,21 +84,21 @@
   }
   
   .result-card:hover {
-    border-color: #667eea;
+    border-color: #333;
     box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
     transform: translateY(-2px);
   }
   
   .result-card.selected {
-    border-color: #667eea;
-    background: linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%);
+    border-color: #333;
+    background: rgba(0, 0, 0, 0.1);
   }
   
   .selected-badge {
     position: absolute;
     top: 1rem;
     right: 1rem;
-    background: #667eea;
+    background: #333;
     color: white;
     padding: 0.5rem 1rem;
     border-radius: 20px;
@@ -213,7 +213,7 @@
   .price {
     font-size: 1.5rem;
     font-weight: bold;
-    color: #667eea;
+    color: #333;
   }
   
   .hotel-rating {
@@ -305,7 +305,7 @@
   }
   
   .generate-button {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #333;
     color: white;
     border: none;
     padding: 1.25rem 3rem;

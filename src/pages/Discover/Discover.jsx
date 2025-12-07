@@ -136,7 +136,7 @@ const Discover = () => {
               <div className="destination-header">
                 <div className="destination-icon">
                   {experience.photos && experience.photos.length > 0 && experience.photos[0] ? (
-                    <img src={experience.photos[0]} alt={experience.destination} style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '8px' }} />
+                    <img src={experience.photos[0]} alt={experience.destination} />
                   ) : (
                     <div style={{ fontSize: '48px' }}>🌍</div>
                   )}

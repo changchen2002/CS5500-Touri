@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { signOutUser } from '../../firebase/auth';
+import WebIcon from './WebIcon.jpg';
 import './Navbar.css';
 
 const Navbar = () => {
@@ -22,8 +23,7 @@ const Navbar = () => {
     <nav className="navbar">
       <div className="navbar-container">
         <Link to="/" className="navbar-logo">
-          <span className="logo-icon">✈️</span>
-          Touri
+          <img src={WebIcon} alt="Touri" className="logo-icon" />
         </Link>
         
         <button 

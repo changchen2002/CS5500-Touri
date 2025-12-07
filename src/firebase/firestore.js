@@ -33,7 +33,9 @@ export const getDocuments = async (collectionName) => {
     const querySnapshot = await getDocs(collection(db, collectionName));
     const documents = [];
     querySnapshot.forEach((doc) => {
-      documents.push({ id: doc.id, ...doc.data() });
+      const data = doc.data();
+      // Ensure Firestore document ID takes precedence over any 'id' field in data
+      documents.push({ ...data, id: doc.id });
     });
     return documents;
   } catch (error) {
@@ -48,7 +50,9 @@ export const getDocument = async (collectionName, docId) => {
     const docSnap = await getDoc(docRef);
     
     if (docSnap.exists()) {
-      return { id: docSnap.id, ...docSnap.data() };
+      const data = docSnap.data();
+      // Ensure Firestore document ID takes precedence over any 'id' field in data
+      return { ...data, id: docSnap.id };
     } else {
       throw new Error('Document not found');
     }
@@ -103,7 +107,9 @@ export const queryDocuments = async (collectionName, conditions = [], orderByFie
     const querySnapshot = await getDocs(q);
     const documents = [];
     querySnapshot.forEach((doc) => {
-      documents.push({ id: doc.id, ...doc.data() });
+      const data = doc.data();
+      // Ensure Firestore document ID takes precedence over any 'id' field in data
+      documents.push({ ...data, id: doc.id });
     });
     return documents;
   } catch (error) {
